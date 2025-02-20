@@ -1324,6 +1324,7 @@ bool PylonROS2CameraImpl<CameraTraitT>::setExtendedBrightness(const int& target_
 {
     float autoTargetBrightnessMin = 0.0;
     float autoTargetBrightnessMax = 0.0;
+    
     if (GenApi::IsAvailable(cam_->AutoTargetValue))
     {
         autoTargetBrightnessMin = cam_->AutoTargetValue.GetMin();
@@ -1334,9 +1335,10 @@ bool PylonROS2CameraImpl<CameraTraitT>::setExtendedBrightness(const int& target_
         autoTargetBrightnessMin = cam_->AutoTargetBrightness.GetMin();
         autoTargetBrightnessMax = cam_->AutoTargetBrightness.GetMax();
     }
-    if (target_brightness > 0 && target_brightness <= 255)
+        
+    if (target_brightness <= autoTargetBrightnessMin || target_brightness > autoTargetBrightnessMax)
     {
-        RCLCPP_ERROR_STREAM(LOGGER_BASE, "Error: Brightness value should be greater than 0 and equal to or smaller than 255");
+        RCLCPP_ERROR_STREAM(LOGGER_BASE, "Error: Brightness value should be greater than " << autoTargetBrightnessMin << " and equal to or smaller than " << autoTargetBrightnessMax);
         return false;
     }
 
