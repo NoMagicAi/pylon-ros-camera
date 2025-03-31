@@ -180,6 +180,8 @@ size_t PylonROS2CameraImpl<CameraTraitT>::currentBinningY()
 template <typename CameraTraitT>
 std::string PylonROS2CameraImpl<CameraTraitT>::currentROSEncoding() const
 {
+    RCLCPP_INFO_STREAM_ONCE(LOGGER_BASE, "Camera's currently set pixel format is " << this->currentBaslerEncoding());
+
     std::string gen_api_encoding(cam_->PixelFormat.ToString().c_str());
     std::string ros_encoding("");
 
@@ -202,7 +204,6 @@ std::string PylonROS2CameraImpl<CameraTraitT>::currentROSEncoding() const
 template <typename CameraTraitT>
 std::string PylonROS2CameraImpl<CameraTraitT>::currentBaslerEncoding() const
 {
-
     return (cam_->PixelFormat.ToString().c_str());
 }
 
@@ -1024,7 +1025,7 @@ bool PylonROS2CameraImpl<CameraTraitT>::setBinningX(const size_t& target_binning
         }
         else
         {
-            RCLCPP_WARN_STREAM(LOGGER_BASE, "Camera does not support binning (X). Will keep the current settings.");
+            RCLCPP_WARN_STREAM_ONCE(LOGGER_BASE, "Camera does not support binning (X). Will keep the current settings.");
             reached_binning_x = currentBinningX();
         }
     }
@@ -1071,7 +1072,7 @@ bool PylonROS2CameraImpl<CameraTraitT>::setBinningY(const size_t& target_binning
         }
         else
         {
-            RCLCPP_WARN_STREAM(LOGGER_BASE, "Camera does not support binning (Y). Will keep the current settings.");
+            RCLCPP_WARN_STREAM_ONCE(LOGGER_BASE, "Camera does not support binning (Y). Will keep the current settings.");
             reached_binning_y = currentBinningY();
         }
     }

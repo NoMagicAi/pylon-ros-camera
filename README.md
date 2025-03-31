@@ -96,6 +96,8 @@ The pylon ROS2 driver support currently the following ROS2 image pixel formats :
 	* bayer_gbrg16 	(Basler Format : BayerGB16, BayerGB12)  (Notes 1&2)
 	* bayer_grbg16 	(Basler Format : BayerGR16, BayerGR12)  (Notes 1&2)
 
+More information about the image encoding can be found in the [Basler documentation](https://docs.baslerweb.com/pixel-format).
+
 **NOTES:**
 
 1 : 12-bits image will be remapped to 16-bits using bit shifting to make it work with the ROS2 16-bits sensor standard message.
