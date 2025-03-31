@@ -870,6 +870,7 @@ bool PylonROS2CameraNode::startGrabbing()
   }
 
   // Framerate Settings
+  RCLCPP_DEBUG(LOGGER, "Maximum possible framerate is %.2f Hz", this->pylon_camera_->maxPossibleFramerate());
   if (this->pylon_camera_->maxPossibleFramerate() < this->pylon_camera_parameter_set_.frameRate())
   {
     RCLCPP_INFO(LOGGER, "Desired framerate %.2f is higher than max possible. Will limit framerate to: %.2f Hz",
