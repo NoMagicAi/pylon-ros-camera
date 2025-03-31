@@ -475,8 +475,8 @@ If you hot-swap the camera with a different camera with a non-compatible pixel e
 
 ### Slow frame rate
 
-If the camera image acquistion is triggered by sofware trigger (default setting), then it is not possible to get the maximum frame rate, because the image acquisition is sequentially triggered, which is not overlapping then.
-Several possible solutions are mentionned and tested in issue [#21](https://github.com/basler/pylon-ros-camera/issues/21), [#28](https://github.com/basler/pylon-ros-camera/issues/28), [#29](https://github.com/basler/pylon-ros-camera/issues/29), [#81](https://github.com/basler/pylon-ros-camera/issues/81), [#116](https://github.com/basler/pylon-ros-camera/issues/116), [#147](https://github.com/basler/pylon-ros-camera/issues/147), and [#200](https://github.com/basler/pylon-ros-camera/issues/200). Please refer to them for more information.
+If the camera image acquistion is triggered by sofware trigger (default setting), then it is not possible to get the maximum frame rate, because the image acquisition is sequentially triggered, which is not overlapping then. The maximum possible framerate should displayed in the terminal when starting the driver.
+Please refer to the [Basler](https://docs.baslerweb.com/resulting-acquisition-frame-rate) documentation to adjust your parameters to increase your framerate. Additionally, several possible solutions are mentionned and tested in issue [#21](https://github.com/basler/pylon-ros-camera/issues/21), [#28](https://github.com/basler/pylon-ros-camera/issues/28), [#29](https://github.com/basler/pylon-ros-camera/issues/29), [#81](https://github.com/basler/pylon-ros-camera/issues/81), [#116](https://github.com/basler/pylon-ros-camera/issues/116), [#147](https://github.com/basler/pylon-ros-camera/issues/147), and [#200](https://github.com/basler/pylon-ros-camera/issues/200). Please refer to them for more information.
 
 ### GigE Devices
 
