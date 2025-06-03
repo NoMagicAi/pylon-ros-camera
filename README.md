@@ -75,9 +75,26 @@ The 3d point clouds acquired by the blaze can be visualized thanks to [rviz2](ht
 For camera models other than the blaze, specific user set can be specified thanks to the `startup_user_set` parameter.  
 ``ros2 launch pylon_ros2_camera_wrapper pylon_ros2_camera.launch.py startup_user_set:=Default``  or ``ros2 launch pylon_ros2_camera_wrapper pylon_ros2_camera.launch.py startup_user_set:=UserSet1`` or ``ros2 launch pylon_ros2_camera_wrapper pylon_ros2_camera.launch.py startup_user_set:=UserSet2`` or ``ros2 launch pylon_ros2_camera_wrapper pylon_ros2_camera.launch.py startup_user_set:=UserSet3``  
 
-The default trigger mode is set to software trigger. This means that the image acquisition is triggered with a certain frame rate, which may be lower than the maximum camera frame rate. The maximum camera frame rate can be reached when running a camera in a free-run or a hardware trigger mode.
+Through the driver, the camera image acquisition is sequentially triggered by software trigger. It is not possible in the current implementation to change this acquisition mode. In other words, it is not possible through the driver to configure for free run and hardware triggered image acquisition.
 
 Beware that some parameters implemented by the driver, like for instance the parameter `startup_user_set`, can be set through 1. the `pylon_ros2_camera_wrapper/config/default.yaml` user parameter file, 2. the `pylon_ros2_camera.launch.py` driver launch file, and 3. the command line arguments of the launch command to start the driver. A parameter value set as an argument of the launch command to start the driver will overwrite the value set in the driver launch file itself, that will overwrite the value set in the user parameter file.    
+
+### Acquisition mode and frame rate
+
+Through the driver, the camera image acquisition is sequentially triggered by software trigger, which makes it impossible to reach the maximum frame rate allowed by the camera itself and reachable with the Pylon Viewer. It is not possible in the current implementation to change this acquisition mode. In other words, it is not possible through the driver to configure for free run and hardware triggered image acquisition.
+
+When starting the driver, the maximum acquisition frame rate that can be reached with the current camera settings and through software triggering is displayed (for further information, please refer to the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate)). If this frame rate is lower than the one specified in the configuration file or in the launch file, the latter is updated accordingly. Except for the blaze, it is not possible to change the acquisition frame rate when the driver is running.
+
+To increase the acquisition frame rate when using the driver, consider when possible and applicable:
+- Changing the image encoding to Bayer or Mono ones.
+- Setting a region of interest.
+- Decreasing the exposure time.
+- Setting the ``enable_current_params_publisher`` parameter to false (it is set to false by default).
+- Following the additional suggestions specified in the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate).
+- Commenting and modifying the different operations executed in ``PylonROS2CameraNode::spin()``. In addition to grabbing, it checks if the camera is disconnected, publishes images and current settings if there are some subscribers, rectifies images if calibration parameters are available, etc.). Beware though that the frame rate increase will not be significant and that the standard driver behaviors will not be guaranteed.
+
+The interested readers can refer to the following discussions for more information: [#21](https://github.com/basler/pylon-ros-camera/issues/21), [#28](https://github.com/basler/pylon-ros-camera/issues/28), [#29](https://github.com/basler/pylon-ros-camera/issues/29), [#81](https://github.com/basler/pylon-ros-camera/issues/81), [#116](https://github.com/basler/pylon-ros-camera/issues/116), [#147](https://github.com/basler/pylon-ros-camera/issues/147), [#200](https://github.com/basler/pylon-ros-camera/issues/200).
+Feel free to reach out and submit pull requests if you are implementing suitable ways to acquire images in a continuous way or through hardware trigger. We will make sure to review them and integrate them if relevant.
 
 ### Image pixel encoding (not for the blaze)
 
@@ -149,7 +166,7 @@ USB cameras must be disconnected and then reconnected after setting a new device
   To speed up the exposure search, the mean brightness is not calculated on the entire image, but on a subset instead. The image is downsampled until a desired window hight is reached. The window hight is calculated out of the image height divided by the downsampling_factor_exposure search.
 
 - **frame_rate**  
-  The desired publisher frame rate if listening to the topics. This parameter can only be set once at start-up. Calling the GrabImages-Action can result in a higher frame rate.
+  The desired acquisition frame rate corresponding to the driver spinning frame rate. Calling the GrabImages-Action can result in a higher frame rate.
 
 - **shutter_mode (not for the blaze)**  
   Set mode of camera's shutter if the value is not empty. The supported modes are 'rolling', 'global' and 'global_reset'. Default value is '' (empty)
@@ -350,7 +367,7 @@ Name          | Notes
 /my_camera/pylon_ros2_camera_node/save_user_set  | -
 /my_camera/pylon_ros2_camera_node/set_PGI_mode  | data : false = deactivate, true = activate
 /my_camera/pylon_ros2_camera_node/set_acquisition_frame_count  | value = new targeted frame count
-/my_camera/pylon_ros2_camera_node/set_acquisition_frame_rate  | value = new targeted framerate
+/my_camera/pylon_ros2_camera_node/set_acquisition_frame_rate  | value = new targeted frame rate
 /my_camera/pylon_ros2_camera_node/set_action_trigger_configuration  | -
 /my_camera/pylon_ros2_camera_node/set_ambiguity_filter_threshold  | value = new ambiguity filter threshold
 /my_camera/pylon_ros2_camera_node/set_binning  | -
@@ -470,31 +487,25 @@ With pylon 7.5.0, if the pylon viewer does not start, this is due to a Qt depend
 
 To increase performance and to minimize CPU usage when grabbing images, the following settings should be considered:
 
-### Camera hot-swapping
-
-If you hot-swap the camera with a different camera with a non-compatible pixel encoding format (e.g., mono and color cameras), you need to restart the ROS system to replace the encoding value or replace the rosparam directly by setting the image_encoding parameter. e.g.,:
-`rosparam set /pylon_camera_node/image_encoding "mono8"`
-
 ### Slow frame rate
 
-If the camera image acquistion is triggered by sofware trigger (default setting), then it is not possible to get the maximum frame rate, because the image acquisition is sequentially triggered, which is not overlapping then. The maximum possible framerate should displayed in the terminal when starting the driver.
-Please refer to the [Basler](https://docs.baslerweb.com/resulting-acquisition-frame-rate) documentation to adjust your parameters to increase your framerate. Additionally, several possible solutions are mentionned and tested in issue [#21](https://github.com/basler/pylon-ros-camera/issues/21), [#28](https://github.com/basler/pylon-ros-camera/issues/28), [#29](https://github.com/basler/pylon-ros-camera/issues/29), [#81](https://github.com/basler/pylon-ros-camera/issues/81), [#116](https://github.com/basler/pylon-ros-camera/issues/116), [#147](https://github.com/basler/pylon-ros-camera/issues/147), and [#200](https://github.com/basler/pylon-ros-camera/issues/200). Please refer to them for more information.
+Please refer to the [dedicated chapter](https://github.com/basler/pylon-ros-camera/edit/jazzy/README.md#acquisition-mode-and-frame-rate) in this documentation for more information.
 
-### GigE Devices
-
-#### No connection with connected camera
+### No connection with connected camera (GigE devices)
 
 To be sure to be able to connect to a specific camera, its network configuration must be manually set through Basler's pylon IP configurator. To do so, click on the camera in the list of connected devices, select the `Static IP` option, set an `IP Address` within the same range as the one of your computer, and set the same `Subnet Mask` as the one from your computer.
 
-#### Maximum UDP Socket Buffer Size
+### Problems acquiring frames
+
+#### Maximum UDP Socket Buffer Size (GigE devices)
 
 The system's maximum UDP receive buffer size should be increased to ensure a stable image acquisition. A maximum size of 2 MB is recommended. This can be achieved by issuing the sudo sysctl net.core.rmem_max=2097152 command. To make this setting persistent, you can add the net.core.rmem_max setting to the /etc/sysctl.conf file.
 
-#### Enable Jumbo Frames.
+#### Enable Jumbo Frames (GigE devices)
 
 Many GigE network adapters support so-called jumbo frames, i.e., network packets larger than the usual 1500 bytes. To enable jumbo frames, the maximum transfer unit (MTU) size of the PC's network adapter must be set to a high value. We recommend using a value of 8192.
 
-#### Increase the packet size.
+#### Increase the packet size (GigE devices)
 
 If your network adapter supports jumbo frames, you set the adapter's MTU to 8192 as described above. In order to take advantage of the adapter's jumbo frame capability, you must also set the packet size used by the camera to 8192.
 
@@ -502,13 +513,11 @@ If you are working with the pylon Viewer application, you can set the packet siz
 
 It is possible to change the packet size by changing the default value of the `mtu_size` parameter in the pylon ROS2 wrapper launch file. When the camera is grabbing, it is not possible to modify this parameter.
 
-#### Real-time Priority
+#### Real-time Priority (GigE devices)
 
 The GigE Vision implementation of Basler pylon software uses a thread for receiving image data. Basler pylon tries to set the thread priority for the receive thread to real-time thread priority. This requires certain permissions. The 'Permissions for Real-time Thread Priorities' section of the pylon INSTALL document describes how to grant the required permissions.
 
-### U3V Devices
-
-#### Increasing Packet Size
+#### Increasing Packet Size (U3V devices)
 
 For faster USB transfers you should increase the packet size. You can do this by changing the "Stream Parameters" -> "Maximum Transfer Size" value from inside the pylon Viewer or by setting the corresponding value via the API. After increasing the package size you will likely run out of kernel space and see corresponding error messages on the console. The default value set by the kernel is 16 MB. To set the value (in this example to 1000 MB) you can execute as root:
 `echo 1000 > /sys/module/usbcore/parameters/usbfs_memory_mb`
