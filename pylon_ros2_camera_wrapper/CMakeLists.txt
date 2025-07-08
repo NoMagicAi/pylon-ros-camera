@@ -42,6 +42,7 @@ find_package(rcutils REQUIRED)
 find_package(pylon_ros2_camera_component REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_geometry REQUIRED)
+find_package(Boost REQUIRED COMPONENTS date_time)
 
 set(CAMERA_WRAPPER_DEPENDENCIES
 	rclcpp

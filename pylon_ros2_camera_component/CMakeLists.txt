@@ -56,6 +56,7 @@ find_package(camera_info_manager REQUIRED)
 find_package(image_geometry REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(diagnostic_updater REQUIRED)
+find_package(Boost REQUIRED COMPONENTS date_time)
 
 if(cv_bridge_VERSION VERSION_GREATER_EQUAL 3.3.0)
     add_compile_definitions(cv_bridge_HPP)
