@@ -81,17 +81,17 @@ Beware that some parameters implemented by the driver, like for instance the par
 
 ### Acquisition mode and frame rate
 
-Through the driver, the camera image acquisition is sequentially triggered by software trigger, which makes it impossible to reach the maximum frame rate allowed by the camera itself and reachable with the Pylon Viewer. It is not possible in the current implementation to change this acquisition mode. In other words, it is not possible through the driver to configure for free run and hardware triggered image acquisition.
+The driver uses **software triggering** to acquire images. This sequential triggering approach inherently limits the achievable frame rate and makes it **impossible** to reach the camera's maximum frame rate achievable with free-run or hardware-triggered acquisition modes. Currently, the driver **does not support** switching to free-run or hardware-triggered acquisition mode.
 
-When starting the driver, the maximum acquisition frame rate that can be reached with the current camera settings and through software triggering is displayed (for further information, please refer to the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate)). If this frame rate is lower than the one specified in the configuration file or in the launch file, the latter is updated accordingly. Except for the blaze, it is not possible to change the acquisition frame rate when the driver is running.
+At driver startup, the maximum achievable frame rate with the current camera settings and software triggering is calculated and logged (for further information, please refer to the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate)). If this value is lower than the frame rate specified in the launch or configuration file, the configured frame rate will be automatically adjusted to the achievable value. Note that this behavior does not apply to the blaze camera, where frame rate adjustment during runtime may be supported.
 
-To increase the acquisition frame rate when using the driver, consider when possible and applicable:
-- Changing the image encoding to Bayer or Mono ones.
-- Setting a region of interest.
-- Decreasing the exposure time.
-- Setting the ``enable_current_params_publisher`` parameter to false (it is set to false by default).
-- Following the additional suggestions specified in the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate).
-- Commenting and modifying the different operations executed in ``PylonROS2CameraNode::spin()``. In addition to grabbing, it checks if the camera is disconnected, publishes images and current settings if there are some subscribers, rectifies images if calibration parameters are available, etc.). Beware though that the frame rate increase will not be significant and that the standard driver behaviors will not be guaranteed.
+To increase the acquisition frame rate when using the driver, consider the following measures when possible and applicable:
+- Use a lower-bandwidth image encoding (e.g., Mono8 or BayerRG8)
+- Define a smaller region of interest (ROI)
+- Reduce the exposure time
+- Set the ``enable_current_params_publisher`` parameter to false (it is set to false by default)
+- Follow performance recommendations in the official [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate).
+- For advanced use cases, comment or optimize the operations executed in ``PylonROS2CameraNode::spin()``. In addition to grabbing, it checks if the camera is disconnected, publishes images and current settings if there are some subscribers, rectifies images if calibration parameters are available, etc.). Be aware though that the frame rate increase may not be significant and that these changes may affect driver stability and compatibility.
 
 The interested readers can refer to the following discussions for more information: [#21](https://github.com/basler/pylon-ros-camera/issues/21), [#28](https://github.com/basler/pylon-ros-camera/issues/28), [#29](https://github.com/basler/pylon-ros-camera/issues/29), [#81](https://github.com/basler/pylon-ros-camera/issues/81), [#116](https://github.com/basler/pylon-ros-camera/issues/116), [#147](https://github.com/basler/pylon-ros-camera/issues/147), [#200](https://github.com/basler/pylon-ros-camera/issues/200).
 Feel free to reach out and submit pull requests if you are implementing suitable ways to acquire images in a continuous way or through hardware trigger. We will make sure to review them and integrate them if relevant.
