@@ -427,6 +427,7 @@ bool PylonROS2CameraImpl<CameraTrait>::grab(std::vector<uint8_t>& image, rclcpp:
         RCLCPP_ERROR(LOGGER_BASE, "Error: Grab was not successful");
         return false;
     }
+    
     const uint8_t *pImageBuffer = reinterpret_cast<uint8_t*>(ptr_grab_result->GetBuffer());
 
     // ------------------------------------------------------------------------

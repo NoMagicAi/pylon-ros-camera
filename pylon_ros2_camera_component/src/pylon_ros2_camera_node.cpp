@@ -909,33 +909,62 @@ bool PylonROS2CameraNode::startGrabbing()
 
 void PylonROS2CameraNode::spin()
 {
-  // TODO: PR#263 : https://github.com/basler/pylon-ros-camera/pull/263 (all commits)
-  // TODO: https://docs.baslerweb.com/pylonapi/cpp/sample_code#grab
-  // TODO: software trigger, as it is until now - test with parameter setting and co
-  // TODO: free run
+  // TODO: software trigger, as it is until now - test with parameter setting and co, reprendre la boucle
+  // TODO: free run, test with parameter access
   // TODO: take into account the maximum frame rate that can be reached (or is it before?)
   // TODO: replace std::cout with RCPP_ blabla
   // TODO: allow user to not set a frame rate and if not it is max
   // TODO: if the actual framerate is longer than the specified framerate, do we flush? we need to take into acocunt the timeout as well
+  // TODO: works with several cameras? when they synchronize? event? voir tous les exampåles de Basler
+  // TODO: use PR#263 as a test
+  // TODO: ne pas oublier les actions
+  // TODO: https://docs.baslerweb.com/pylonapi/cpp/sample_code#grab
 
   double frame_step = 1.0 / this->frameRate();
-  // std::cout << this->frameRate() << " " << frame_step << std::endl;
+  std::cout << this->frameRate() << " " << frame_step << std::endl;
   // 41.5973 0.02404
 
   while (!this->stop_spinning_ && rclcpp::ok())
   {
-    double before_grab_time = rclcpp::Clock().now().seconds();
+    double start_time = rclcpp::Clock().now().seconds();
 
     // grab
     std::cout << "GRAB" << std::endl;
-    std::this_thread::sleep_for(std::chrono::duration<double>(0.02));
+    //std::this_thread::sleep_for(std::chrono::duration<double>(0.02));
 
-    // compute real frame rate, just taking into account the acquisition time
-    double after_grab_time = rclcpp::Clock().now().seconds();
-    double tdiff = after_grab_time - before_grab_time;
+    const bool any_subscriber = (this->img_raw_pub_.getNumSubscribers() != 0 || this->getNumSubscribersRectImagePub() != 0);
+    if (!this->isSleeping() && any_subscriber)
+    {
+      if (!this->grabImage())
+      {
+        continue;
+      }
+    }
+
+    // compute grab time
+    double grab_time = rclcpp::Clock().now().seconds();
+    double tdiff = grab_time - start_time;
     //std::cout << tdiff << std::endl;
-    double real_frame_rate = 1.0 / tdiff;
-    std::cout << "Real frame rate: " << real_frame_rate << std::endl;
+    double grab_frame_rate = 1.0 / tdiff;
+    std::cout << "Grabbing frame rate: " << grab_frame_rate << std::endl;
+
+    // publish if subscribers
+    if (this->img_raw_pub_.getNumSubscribers() > 0)
+    {
+      // get actual cam_info-object in every frame, because it might have
+      // changed due to a 'set_camera_info'-service call
+      sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();
+      cam_info.header.stamp = this->img_raw_msg_.header.stamp;
+      // publish via image_transport
+      this->img_raw_pub_.publish(this->img_raw_msg_, cam_info);
+    }
+
+    // compute real frame rate, taking into account grabbing and other processes
+    double loop_it_time = rclcpp::Clock().now().seconds();
+    tdiff = loop_it_time - start_time;
+    //std::cout << tdiff << std::endl;
+    double loop_frame_rate = 1.0 / tdiff;
+    std::cout << "Loop frame rate: " << loop_frame_rate << std::endl;
 
     // the user has set a frame rate - wait accordingly to respect it
     if (tdiff > 0)  // just in case of but should never happen
@@ -945,10 +974,10 @@ void PylonROS2CameraNode::spin()
     }
 
     // compute actual frame rate, just to check
-    after_grab_time = rclcpp::Clock().now().seconds();
-    tdiff = after_grab_time - before_grab_time;
-    double actual_frame_rate = 1.0 / tdiff;
-    std::cout << "Actual frame rate: " << actual_frame_rate << std::endl;
+    double check_loop_it_time = rclcpp::Clock().now().seconds();
+    tdiff = check_loop_it_time - start_time;
+    double check_frame_rate = 1.0 / tdiff;
+    std::cout << "Check frame rate: " << check_frame_rate << std::endl;
   }
 
   std::cout << "Spinning loop is stopped" << std::endl;
