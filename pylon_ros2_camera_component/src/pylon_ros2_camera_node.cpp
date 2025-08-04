@@ -909,16 +909,18 @@ bool PylonROS2CameraNode::startGrabbing()
 
 void PylonROS2CameraNode::spin()
 {
-  // TODO: test quick and long acquisition simulation (with some kind of wait)
   // TODO: PR#263 : https://github.com/basler/pylon-ros-camera/pull/263 (all commits)
   // TODO: https://docs.baslerweb.com/pylonapi/cpp/sample_code#grab
   // TODO: software trigger, as it is until now - test with parameter setting and co
   // TODO: free run
+  // TODO: take into account the maximum frame rate that can be reached (or is it before?)
   // TODO: replace std::cout with RCPP_ blabla
   // TODO: allow user to not set a frame rate and if not it is max
+  // TODO: if the actual framerate is longer than the specified framerate, do we flush? we need to take into acocunt the timeout as well
 
   double frame_step = 1.0 / this->frameRate();
-  //std::cout << this->frameRate() << " " << frame_step << std::endl;
+  // std::cout << this->frameRate() << " " << frame_step << std::endl;
+  // 41.5973 0.02404
 
   while (!this->stop_spinning_ && rclcpp::ok())
   {
@@ -926,6 +928,7 @@ void PylonROS2CameraNode::spin()
 
     // grab
     std::cout << "GRAB" << std::endl;
+    std::this_thread::sleep_for(std::chrono::duration<double>(0.02));
 
     // compute real frame rate, just taking into account the acquisition time
     double after_grab_time = rclcpp::Clock().now().seconds();
