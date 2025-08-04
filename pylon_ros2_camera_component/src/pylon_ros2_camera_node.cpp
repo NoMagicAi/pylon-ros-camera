@@ -909,16 +909,20 @@ bool PylonROS2CameraNode::startGrabbing()
 
 void PylonROS2CameraNode::spin()
 {
-  // TODO: software trigger, as it is until now - test with parameter setting and co, reprendre la boucle
   // TODO: free run, test with parameter access
+  // TODO: https://docs.baslerweb.com/pylonapi/cpp/sample_code#grab
+
   // TODO: take into account the maximum frame rate that can be reached (or is it before?)
+  // TODO: do some testing when software trigger, when we lose frames
   // TODO: replace std::cout with RCPP_ blabla
   // TODO: allow user to not set a frame rate and if not it is max
   // TODO: if the actual framerate is longer than the specified framerate, do we flush? we need to take into acocunt the timeout as well
   // TODO: works with several cameras? when they synchronize? event? voir tous les exampåles de Basler
   // TODO: use PR#263 as a test
   // TODO: ne pas oublier les actions
-  // TODO: https://docs.baslerweb.com/pylonapi/cpp/sample_code#grab
+  // TODO: rename spin function into spinning thread
+  // TODO: remove comments
+  // TODO: documentation
 
   double frame_step = 1.0 / this->frameRate();
   std::cout << this->frameRate() << " " << frame_step << std::endl;
@@ -927,36 +931,165 @@ void PylonROS2CameraNode::spin()
   while (!this->stop_spinning_ && rclcpp::ok())
   {
     double start_time = rclcpp::Clock().now().seconds();
+    double tdiff; // used to compute time difference during the grabbing process
+
+    // check if the camera is disconnected
+    // the call time cost to isCamRemoved() is unsignificant with respect to the grabbing frame rate
+    if (this->pylon_camera_->isCamRemoved())
+    {
+      RCLCPP_ERROR(LOGGER, "Camera is disconnected, trying now to reconnect");
+
+      this->cm_status_.status_id = pylon_ros2_camera_interfaces::msg::ComponentStatus::ERROR;
+      this->cm_status_.status_msg = "Camera is disconnected, trying now to reconnect";
+
+      if (this->pylon_camera_parameter_set_.enable_status_publisher_)
+      {
+        this->component_status_pub_->publish(this->cm_status_);
+      }
+
+      if (this->pylon_camera_ != nullptr)
+      {
+        this->pylon_camera_.reset();
+      }
+
+      // Possible issue here: ROS2 does not allow to shutdown services
+      // Services are shutdown in the ROS 1 pylon version at this level
+      this->set_user_output_srvs_.clear();
+
+      rclcpp::Rate r(0.5);
+      r.sleep();
+
+      this->init();
+
+      continue;
+    }
 
     // grab
-    std::cout << "GRAB" << std::endl;
+    std::cout << ">>> GRAB" << std::endl;
     //std::this_thread::sleep_for(std::chrono::duration<double>(0.02));
 
-    const bool any_subscriber = (this->img_raw_pub_.getNumSubscribers() != 0 || this->getNumSubscribersRectImagePub() != 0);
-    if (!this->isSleeping() && any_subscriber)
+    if (!this->pylon_camera_->isBlaze())
     {
-      if (!this->grabImage())
+      // connected camera is not blaze
+
+      const bool any_subscriber = (this->img_raw_pub_.getNumSubscribers() != 0 || this->getNumSubscribersRectImagePub() != 0);
+      if (!this->isSleeping() && any_subscriber)
       {
-        continue;
+        if (!this->grabImage())
+        {
+          continue;
+        }
+      }
+
+      // compute grab time
+      double grab_time = rclcpp::Clock().now().seconds();
+      tdiff = grab_time - start_time;
+      //std::cout << tdiff << std::endl;
+      double grab_frame_rate = 1.0 / tdiff;
+      std::cout << "Grabbing frame rate: " << grab_frame_rate << std::endl;
+
+      // publish if subscribers
+      if (this->img_raw_pub_.getNumSubscribers() > 0)
+      {
+        // get actual cam_info-object in every frame, because it might have
+        // changed due to a 'set_camera_info'-service call
+        sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();
+        cam_info.header.stamp = this->img_raw_msg_.header.stamp;
+        // publish via image_transport
+        this->img_raw_pub_.publish(this->img_raw_msg_, cam_info);
+      }
+
+      // this->getNumSubscribersRectImagePub() involves that this->camera_info_manager_->isCalibrated() == true
+      if (this->getNumSubscribersRectImagePub() > 0)
+      {
+        this->cv_bridge_img_rect_->header.stamp = this->img_raw_msg_.header.stamp;
+        assert(this->pinhole_model_->initialized());
+
+        const int bit_depth = sensor_msgs::image_encodings::bitDepth(img_raw_msg_.encoding);
+        std::string rect_encoding = img_raw_msg_.encoding;
+        if (bit_depth == 8 && sensor_msgs::image_encodings::isBayer(rect_encoding))
+        {
+          rect_encoding = "bgr8";
+        }
+        else if (bit_depth == 16 && sensor_msgs::image_encodings::isBayer(rect_encoding))
+        {
+          rect_encoding ="bgr16";
+        }
+        this->cv_bridge_img_rect_->encoding = rect_encoding;
+        
+        cv_bridge::CvImagePtr cv_img_raw = cv_bridge::toCvCopy(this->img_raw_msg_, rect_encoding);
+        if (cv_img_raw == nullptr)
+        {
+          RCLCPP_ERROR(LOGGER, "Failed to initialize rectified image, not publishing it");
+        }
+        else
+        {
+          this->pinhole_model_->fromCameraInfo(this->camera_info_manager_->getCameraInfo());
+          this->pinhole_model_->rectifyImage(cv_img_raw->image, this->cv_bridge_img_rect_->image);
+          this->img_rect_pub_->publish(this->cv_bridge_img_rect_->toImageMsg());
+        }
+      }
+    }
+    else
+    {
+      // connected camera is blaze
+
+      const bool any_subscriber = (this->count_subscribers(this->blaze_cloud_topic_name_) != 0 || 
+                                  this->count_subscribers(this->blaze_intensity_topic_name_) != 0 ||
+                                  this->count_subscribers(this->blaze_depth_map_topic_name_) != 0 ||
+                                  this->count_subscribers(this->blaze_depth_map_color_topic_name_) != 0 ||
+                                  this->count_subscribers(this->blaze_confidence_topic_name_) != 0);
+
+      if (!this->isSleeping() && any_subscriber)
+      {
+        this->pylon_camera_->getInitialCameraInfo(this->blaze_cam_info_msg_);
+
+        if (!this->grabImage())
+        {
+          continue;
+        }
+
+        // compute grab time
+        double grab_time = rclcpp::Clock().now().seconds();
+        tdiff = grab_time - start_time;
+        //std::cout << tdiff << std::endl;
+        double grab_frame_rate = 1.0 / tdiff;
+        std::cout << "Grabbing frame rate: " << grab_frame_rate << std::endl;
+
+        RCLCPP_INFO_STREAM_ONCE(LOGGER, "Camera frame from parameter server: " << this->pylon_camera_parameter_set_.cameraFrame());
+        
+        this->blaze_cloud_msg_.header.frame_id = cameraFrame();
+        this->intensity_map_msg_.header.frame_id = cameraFrame();
+        this->depth_map_msg_.header.frame_id = cameraFrame();
+        this->depth_map_color_msg_.header.frame_id = cameraFrame();
+        this->confidence_map_msg_.header.frame_id = cameraFrame();
+        this->blaze_cam_info_msg_.header.frame_id = cameraFrame();
+        
+        this->blaze_cloud_pub_->publish(this->blaze_cloud_msg_);
+        this->blaze_intensity_pub_->publish(this->intensity_map_msg_);
+        this->blaze_depth_map_pub_->publish(this->depth_map_msg_);
+        this->blaze_depth_map_color_pub_->publish(this->depth_map_color_msg_);
+        this->blaze_confidence_pub_->publish(this->confidence_map_msg_);
+        this->blaze_cam_info_pub_->publish(this->blaze_cam_info_msg_);
       }
     }
 
-    // compute grab time
-    double grab_time = rclcpp::Clock().now().seconds();
-    double tdiff = grab_time - start_time;
-    //std::cout << tdiff << std::endl;
-    double grab_frame_rate = 1.0 / tdiff;
-    std::cout << "Grabbing frame rate: " << grab_frame_rate << std::endl;
-
-    // publish if subscribers
-    if (this->img_raw_pub_.getNumSubscribers() > 0)
+    // Check if the image encoding changed , then save the new image encoding and restart the image grabbing to fix the ros sensor message type issue.
+    if (this->pylon_camera_parameter_set_.imageEncoding() != this->pylon_camera_->currentROSEncoding()) 
     {
-      // get actual cam_info-object in every frame, because it might have
-      // changed due to a 'set_camera_info'-service call
-      sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();
-      cam_info.header.stamp = this->img_raw_msg_.header.stamp;
-      // publish via image_transport
-      this->img_raw_pub_.publish(this->img_raw_msg_, cam_info);
+      this->pylon_camera_parameter_set_.setimageEncodingParam(*this, this->pylon_camera_->currentROSEncoding());
+      this->grabbingStopping();
+      this->grabbingStarting();
+    }
+    
+    if (this->pylon_camera_parameter_set_.enable_status_publisher_)
+    {
+      this->component_status_pub_->publish(this->cm_status_);
+    }
+
+    if (this->pylon_camera_parameter_set_.enable_current_params_publisher_)
+    {
+      this->publishCurrentParams();
     }
 
     // compute real frame rate, taking into account grabbing and other processes
@@ -981,143 +1114,6 @@ void PylonROS2CameraNode::spin()
   }
 
   std::cout << "Spinning loop is stopped" << std::endl;
-
-  
-
-  // if (this->pylon_camera_->isCamRemoved())
-  // {
-  //   RCLCPP_ERROR(LOGGER, "Camera is disconnected, trying now to reconnect");
-
-  //   this->cm_status_.status_id = pylon_ros2_camera_interfaces::msg::ComponentStatus::ERROR;
-  //   this->cm_status_.status_msg = "Camera is disconnected, trying now to reconnect";
-
-  //   if (this->pylon_camera_parameter_set_.enable_status_publisher_)
-  //   {
-  //     this->component_status_pub_->publish(this->cm_status_);
-  //   }
-
-  //   if (this->pylon_camera_ != nullptr)
-  //   {
-  //     this->pylon_camera_.reset();
-  //   }
-
-  //   // Possible issue here: ROS2 does not allow to shutdown services
-  //   // Services are shutdown in the ROS 1 pylon version at this level
-  //   this->set_user_output_srvs_.clear();
-
-  //   rclcpp::Rate r(0.5);
-  //   r.sleep();
-
-  //   this->init();
-
-  //   return;
-  // }
-
-  // if (!this->pylon_camera_->isBlaze())
-  // {
-  //   const bool any_subscriber = (this->img_raw_pub_.getNumSubscribers() != 0 || this->getNumSubscribersRectImagePub() != 0);
-  //   if (!this->isSleeping() && any_subscriber)
-  //   {
-  //     if (any_subscriber)
-  //     {
-  //       if (!this->grabImage())
-  //       {
-  //         return;
-  //       }
-  //     }
-
-  //     if (this->img_raw_pub_.getNumSubscribers() > 0)
-  //     {
-  //       // get actual cam_info-object in every frame, because it might have
-  //       // changed due to a 'set_camera_info'-service call
-  //       sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();
-  //       cam_info.header.stamp = this->img_raw_msg_.header.stamp;
-  //       // publish via image_transport
-  //       this->img_raw_pub_.publish(this->img_raw_msg_, cam_info);
-  //     }
-
-  //     // this->getNumSubscribersRectImagePub() involves that this->camera_info_manager_->isCalibrated() == true
-  //     if (this->getNumSubscribersRectImagePub() > 0)
-  //     {
-  //       this->cv_bridge_img_rect_->header.stamp = this->img_raw_msg_.header.stamp;
-  //       assert(this->pinhole_model_->initialized());
-
-  //       const int bit_depth = sensor_msgs::image_encodings::bitDepth(img_raw_msg_.encoding);
-  //       std::string rect_encoding = img_raw_msg_.encoding;
-  //       if (bit_depth == 8 && sensor_msgs::image_encodings::isBayer(rect_encoding))
-  //       {
-  //         rect_encoding = "bgr8";
-  //       }
-  //       else if (bit_depth == 16 && sensor_msgs::image_encodings::isBayer(rect_encoding))
-  //       {
-  //         rect_encoding ="bgr16";
-  //       }
-  //       this->cv_bridge_img_rect_->encoding = rect_encoding;
-        
-  //       cv_bridge::CvImagePtr cv_img_raw = cv_bridge::toCvCopy(this->img_raw_msg_, rect_encoding);
-  //       if (cv_img_raw == nullptr)
-  //       {
-  //         RCLCPP_ERROR(LOGGER, "Failed to initialize rectified image, not publishing it");
-  //       }
-  //       else
-  //       {
-  //         this->pinhole_model_->fromCameraInfo(this->camera_info_manager_->getCameraInfo());
-  //         this->pinhole_model_->rectifyImage(cv_img_raw->image, this->cv_bridge_img_rect_->image);
-  //         this->img_rect_pub_->publish(this->cv_bridge_img_rect_->toImageMsg());
-  //       }
-  //     }
-  //   }
-  // }
-  // else
-  // {
-  //   if (!this->isSleeping() && (this->count_subscribers(this->blaze_cloud_topic_name_) ||
-  //                               this->count_subscribers(this->blaze_intensity_topic_name_) ||
-  //                               this->count_subscribers(this->blaze_depth_map_topic_name_) ||
-  //                               this->count_subscribers(this->blaze_depth_map_color_topic_name_) ||
-  //                               this->count_subscribers(this->blaze_confidence_topic_name_)))
-  //   {
-  //     this->pylon_camera_->getInitialCameraInfo(this->blaze_cam_info_msg_);
-
-  //     if (!this->grabImage())
-  //     {
-  //       return;
-  //     }
-
-  //     RCLCPP_INFO_STREAM_ONCE(LOGGER, "Camera frame from parameter server: " << this->pylon_camera_parameter_set_.cameraFrame());
-      
-  //     this->blaze_cloud_msg_.header.frame_id = cameraFrame();
-  //     this->intensity_map_msg_.header.frame_id = cameraFrame();
-  //     this->depth_map_msg_.header.frame_id = cameraFrame();
-  //     this->depth_map_color_msg_.header.frame_id = cameraFrame();
-  //     this->confidence_map_msg_.header.frame_id = cameraFrame();
-  //     this->blaze_cam_info_msg_.header.frame_id = cameraFrame();
-      
-  //     this->blaze_cloud_pub_->publish(this->blaze_cloud_msg_);
-  //     this->blaze_intensity_pub_->publish(this->intensity_map_msg_);
-  //     this->blaze_depth_map_pub_->publish(this->depth_map_msg_);
-  //     this->blaze_depth_map_color_pub_->publish(this->depth_map_color_msg_);
-  //     this->blaze_confidence_pub_->publish(this->confidence_map_msg_);
-  //     this->blaze_cam_info_pub_->publish(this->blaze_cam_info_msg_);
-  //   }
-  // }
-
-  // // Check if the image encoding changed , then save the new image encoding and restart the image grabbing to fix the ros sensor message type issue.
-  // if (this->pylon_camera_parameter_set_.imageEncoding() != this->pylon_camera_->currentROSEncoding()) 
-  // {
-  //   this->pylon_camera_parameter_set_.setimageEncodingParam(*this, this->pylon_camera_->currentROSEncoding());
-  //   this->grabbingStopping();
-  //   this->grabbingStarting();
-  // }
-  
-  // if (this->pylon_camera_parameter_set_.enable_status_publisher_)
-  // {
-  //   this->component_status_pub_->publish(this->cm_status_);
-  // }
-
-  // if (this->pylon_camera_parameter_set_.enable_current_params_publisher_)
-  {
-    this->publishCurrentParams();
-  }
 }
 
 bool PylonROS2CameraNode::grabImage()
