@@ -122,7 +122,7 @@
     #  for most of GigE cameras, a value of 1000 is reasonable
     #  for cameras used on a single-board computer this value should be set to 11772
     #  beware that the inter-packet delay decrease will result in frame rate reduction
-    inter_pkg_delay: 1000
+    # inter_pkg_delay: 1000
 
     #  Only used for GigE cameras.
     #  The frame transmission delay in ticks.

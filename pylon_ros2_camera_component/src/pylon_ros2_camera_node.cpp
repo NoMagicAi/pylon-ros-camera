@@ -59,7 +59,7 @@ PylonROS2CameraNode::PylonROS2CameraNode(const rclcpp::NodeOptions& options)
   , diagnostics_updater_(this)
 {
   // information logging severity mode
-  rcutils_ret_t __attribute__((unused)) res = rcutils_logging_set_logger_level(LOGGER.get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+  //rcutils_ret_t __attribute__((unused)) res = rcutils_logging_set_logger_level(LOGGER.get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
   //RCUTILS_LOG_SEVERITY_DEBUG
   //RCUTILS_LOG_SEVERITY_INFO
   //RCUTILS_LOG_SEVERITY_WARN
@@ -75,9 +75,6 @@ PylonROS2CameraNode::PylonROS2CameraNode(const rclcpp::NodeOptions& options)
 
   // starting spinning thread
   RCLCPP_INFO_STREAM(LOGGER, "Start image grabbing if node connects to topic with a spinning rate of: " << this->frameRate() << " Hz");
-  // timer_ = this->create_wall_timer(
-  //           std::chrono::duration<double>(1. / this->frameRate()),
-  //           std::bind(&PylonROS2CameraNode::spin, this));
   this->stop_spinning_ = false;
   this->spin_thread_ = std::thread(&PylonROS2CameraNode::spin, this);
 }
@@ -88,7 +85,6 @@ PylonROS2CameraNode::~PylonROS2CameraNode()
   if (this->spin_thread_.joinable())
   {
     this->spin_thread_.join();
-    std::cout << "Thread is stopped" << std::endl;
   }
 
   if (this->img_rect_pub_)
@@ -909,25 +905,7 @@ bool PylonROS2CameraNode::startGrabbing()
 
 void PylonROS2CameraNode::spin()
 {
-  // TODO: free run, test with parameter access
-
-  // TODO: take into account the maximum frame rate that can be reached (or is it before?)
-  // TODO: do some testing when software trigger, when we lose frames
-  // TODO: replace std::cout with RCPP_ blabla
-  // TODO: allow user to not set a frame rate and if not it is max
-  // TODO: if the actual framerate is longer than the specified framerate, do we flush? we need to take into acocunt the timeout as well
-  // TODO: works with several cameras? when they synchronize? event? voir tous les exampåles de Basler
-  // TODO: use PR#263 as a test
-  // TODO: ne pas oublier les actions
-  // TODO: rename spin function into spinning thread
-  // TODO: remove comments
-  // TODO: documentation
-  // TODO: TriggerSoftware.Execute() to check
-  // TODO: faire des get services pour trigger selector, source and mode
-  // TODO: trigger selector, source and mode: rajouter les posibilites en terme de valeurs possibles
-
   double frame_step = 1.0 / this->frameRate();
-  // std::cout << this->frameRate() << " " << frame_step << std::endl; // 41.5973 0.02404 with my camera
 
   while (!this->stop_spinning_ && rclcpp::ok())
   {
@@ -966,7 +944,7 @@ void PylonROS2CameraNode::spin()
     }
 
     // grab
-    RCLCPP_DEBUG(LOGGER, ">>> NEW GRAB");
+    RCLCPP_DEBUG(LOGGER, ">>> New frame grabbing <<<");
 
     if (!this->pylon_camera_->isBlaze())
     {
@@ -985,7 +963,7 @@ void PylonROS2CameraNode::spin()
       double grab_time = rclcpp::Clock().now().seconds();
       tdiff = grab_time - start_time;
       double grab_frame_rate = 1.0 / tdiff;
-      RCLCPP_DEBUG_STREAM(LOGGER, "Grabbing frame rate: " << grab_frame_rate);
+      RCLCPP_DEBUG_STREAM(LOGGER, "Frame grabbing rate: " << grab_frame_rate);
 
       // publish if subscribers
       if (this->img_raw_pub_.getNumSubscribers() > 0)
@@ -1052,7 +1030,7 @@ void PylonROS2CameraNode::spin()
         double grab_time = rclcpp::Clock().now().seconds();
         tdiff = grab_time - start_time;
         double grab_frame_rate = 1.0 / tdiff;
-        RCLCPP_DEBUG_STREAM(LOGGER, "Grabbing frame rate: " << grab_frame_rate);
+        RCLCPP_DEBUG_STREAM(LOGGER, "Frame grabbing rate: " << grab_frame_rate);
 
         RCLCPP_INFO_STREAM_ONCE(LOGGER, "Camera frame from parameter server: " << this->pylon_camera_parameter_set_.cameraFrame());
         
@@ -1094,7 +1072,7 @@ void PylonROS2CameraNode::spin()
     double loop_it_time = rclcpp::Clock().now().seconds();
     tdiff = loop_it_time - start_time;
     double loop_frame_rate = 1.0 / tdiff;
-    RCLCPP_DEBUG_STREAM(LOGGER, "Loop frame rate: " << loop_frame_rate);
+    RCLCPP_DEBUG_STREAM(LOGGER, "Actual spinning frame rate: " << loop_frame_rate);
 
     // the user has set a frame rate - wait accordingly to respect it
     if (tdiff > 0)  // just in case of but should never happen
@@ -1107,10 +1085,8 @@ void PylonROS2CameraNode::spin()
     double check_loop_it_time = rclcpp::Clock().now().seconds();
     tdiff = check_loop_it_time - start_time;
     double check_frame_rate = 1.0 / tdiff;
-    RCLCPP_DEBUG_STREAM(LOGGER, "Check frame rate: " << check_frame_rate);
+    RCLCPP_DEBUG_STREAM(LOGGER, "Spinning frame rate (to check): " << check_frame_rate);
   }
-
-  std::cout << "Spinning loop is stopped" << std::endl;
 }
 
 bool PylonROS2CameraNode::grabImage()
@@ -1910,12 +1886,7 @@ std::string PylonROS2CameraNode::executeSoftwareTrigger()
 }
 
 std::string PylonROS2CameraNode::setTriggerSource(const int& source)
-{   
-  // source 0 = Software
-  // source 1 = Line1
-  // source 2 = Line3
-  // source 2 = Line4
-  // source 4 = Action1(only selected GigE Camera)
+{
   std::lock_guard<std::recursive_mutex> lock(this->grab_mutex_);
   if (!this->pylon_camera_->isReady())
   {
