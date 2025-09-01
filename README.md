@@ -81,6 +81,8 @@ Beware that some parameters implemented by the driver, like for instance the par
 
 ### Acquisition mode and frame rate
 
+_From driver version 3.1.0, enabling free run is now possible. Please check out [the dedicated branch](https://github.com/basler/pylon-ros-camera/tree/jazzy_3.0.4_freerun) implementing this feature (only for Jazzy and beta version). Beware that even if the API stays unchanged, some default parameters have been changed, which may result in expected behaviors from the system and user end._
+
 The driver uses **software triggering** to acquire images. This sequential triggering approach inherently limits the achievable frame rate and makes it **impossible** to reach the camera's maximum frame rate achievable with free-run or hardware-triggered acquisition modes. Currently, the driver **does not support** switching to free-run or hardware-triggered acquisition mode.
 
 At driver startup, the maximum achievable frame rate with the current camera settings and software triggering is calculated and logged (for further information, please refer to the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate)). If this value is lower than the frame rate specified in the launch or configuration file, the configured frame rate will be automatically adjusted to the achievable value. Note that this behavior does not apply to the blaze camera, where frame rate adjustment during runtime may be supported.
