@@ -67,7 +67,7 @@ PylonROS2DARTCamera::~PylonROS2DARTCamera()
 
 bool PylonROS2DARTCamera::applyCamSpecificStartupSettings(const PylonROS2CameraParameter& parameters)
 {
-    if ( !PylonROS2USBCamera::applyCamSpecificStartupSettings(parameters) )
+    if (!PylonROS2USBCamera::applyCamSpecificStartupSettings(parameters))
     {
         return false;
     }

@@ -2037,7 +2037,8 @@ template <typename CameraTraitT>
 std::string PylonROS2CameraImpl<CameraTraitT>::setTriggerMode(const bool& value)
 {
     try
-    {   if ( GenApi::IsAvailable(cam_->TriggerMode) )
+    {   
+        if (GenApi::IsAvailable(cam_->TriggerMode))
         {
             if (value)
             {
@@ -2055,11 +2056,12 @@ std::string PylonROS2CameraImpl<CameraTraitT>::setTriggerMode(const bool& value)
         }
 
     }
-    catch ( const GenICam::GenericException &e )
+    catch (const GenICam::GenericException &e)
     {
         RCLCPP_ERROR_STREAM(LOGGER_BASE, "An exception while setting the trigger mode occurred:" << e.GetDescription());
         return e.GetDescription();
     }
+
     return "done";
 }
 

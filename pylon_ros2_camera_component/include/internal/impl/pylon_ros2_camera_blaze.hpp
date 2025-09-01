@@ -312,6 +312,8 @@ bool PylonROS2BlazeCamera::applyCamSpecificStartupSettings(const PylonROS2Camera
 
         // set up some default parameters
         
+        // software triggering by default
+        blaze_cam_->TriggerSelector.SetValue(Pylon::BlazeCameraParams_Params::TriggerSelector_FrameStart);
         blaze_cam_->TriggerSource.SetValue(Pylon::BlazeCameraParams_Params::TriggerSource_Software);
         blaze_cam_->TriggerMode.SetValue(Pylon::BlazeCameraParams_Params::TriggerMode_On);
 

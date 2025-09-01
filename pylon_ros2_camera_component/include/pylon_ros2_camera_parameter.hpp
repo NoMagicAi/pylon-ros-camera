@@ -263,10 +263,13 @@ public:
     std::string startup_user_set_;
 
     /**
-     * The inter-package delay in ticks. Only used for GigE cameras.
-     * To prevent lost frames it should be greater 0.
-     * For most of GigE cameras, a value of 1000 is reasonable.
-     * For GigE cameras used on a single-board computer this value should be set to 11772
+     * the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+     * generally needs to modified if more than one cameras is involved or if hardware is not performing well
+     * raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+     * https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+     * for most of GigE cameras, a value of 1000 is reasonable
+     * for cameras used on a single-board computer this value should be set to 11772
+     * beware that the inter-packet delay decrease will result in frame rate reduction
      */
     int inter_pkg_delay_;
 

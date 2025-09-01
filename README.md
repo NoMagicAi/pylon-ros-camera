@@ -89,6 +89,7 @@ To increase the acquisition frame rate when using the driver, consider when poss
 - Changing the image encoding to Bayer or Mono ones.
 - Setting a region of interest.
 - Decreasing the exposure time.
+- Decreasing the inter-packet delay and setting it to 0 if possible.
 - Setting the ``enable_current_params_publisher`` parameter to false (it is set to false by default).
 - Following the additional suggestions specified in the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate).
 - Commenting and modifying the different operations executed in ``PylonROS2CameraNode::spin()``. In addition to grabbing, it checks if the camera is disconnected, publishes images and current settings if there are some subscribers, rectifies images if calibration parameters are available, etc.). Beware though that the frame rate increase will not be significant and that the standard driver behaviors will not be guaranteed.
@@ -220,10 +221,10 @@ The following settings do **NOT** have to be set. Each camera has default values
   The MTU size. Only used for GigE cameras. To prevent lost frames configure the camera has to be configured with the MTU size the network card supports. A value greater 3000 should be good (1500 for single-board computer)
 
 - **gige/inter_pkg_delay (not for the blaze)**  
-  The inter-packet delay in ticks. Only used for GigE cameras. To prevent lost frames it should be greater than 0. For most of GigE cameras, a value of 1000 is reasonable. For GigE cameras used on single-board computer, this value should be set to 11772.
+  The inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation. Generally needs to modified if more than one cameras is involved or if hardware is not performing well. Raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed': https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras. For most of GigE cameras, a value of 1000 is reasonable. For cameras used on a single-board computer this value should be set to 11772. Beware that the inter-packet delay decrease will result in frame rate reduction.
 
 - **gige/frame_transmission_delay (not for the blaze)**  
- In most cases, this parameter should be set to 0. However, if your network hardware can't handle spikes in network traffic (e.g., if you are triggering multiple camera simultaneously), you can use the frame transmission delay parameter to stagger the start of image data transmissions from each camera.
+  In most cases, this parameter should be set to 0. However, if your network hardware can't handle spikes in network traffic (e.g., if you are triggering multiple camera simultaneously), you can use the frame transmission delay parameter to stagger the start of image data transmissions from each camera.
 
 - **auto_flash (not for the blaze)**  
   Flag that indicates if the camera has a flash connected, which should be on exposure. Only supported for GigE cameras. Default: false.
@@ -517,8 +518,8 @@ It is possible to change the packet size by changing the default value of the `m
 
 The GigE Vision implementation of Basler pylon software uses a thread for receiving image data. Basler pylon tries to set the thread priority for the receive thread to real-time thread priority. This requires certain permissions. The 'Permissions for Real-time Thread Priorities' section of the pylon INSTALL document describes how to grant the required permissions.
 
-#### Increasing Packet Size (U3V devices)
+#### Increase Packet Size (U3V devices)
 
-For faster USB transfers you should increase the packet size. You can do this by changing the "Stream Parameters" -> "Maximum Transfer Size" value from inside the pylon Viewer or by setting the corresponding value via the API. After increasing the package size you will likely run out of kernel space and see corresponding error messages on the console. The default value set by the kernel is 16 MB. To set the value (in this example to 1000 MB) you can execute as root:
+For faster USB transfers you should increase the packet size. You can do this by changing the "Stream Parameters" -> "Maximum Transfer Size" value from inside the pylon Viewer or by setting the corresponding value via the API. After increasing the packet size you will likely run out of kernel space and see corresponding error messages on the console. The default value set by the kernel is 16 MB. To set the value (in this example to 1000 MB) you can execute as root:
 `echo 1000 > /sys/module/usbcore/parameters/usbfs_memory_mb`
 This would assign a maximum of 1000 MB to the USB stack.

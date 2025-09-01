@@ -57,11 +57,11 @@ PylonROS2CameraParameter::PylonROS2CameraParameter() :
     gain_auto_(true),
     exposure_search_timeout_(5.),
     auto_exposure_upper_limit_(0.0),
-    mtu_size_(3000),
+    mtu_size_(1500),
     enable_status_publisher_(false),
     enable_current_params_publisher_(false),
     startup_user_set_(""),
-    inter_pkg_delay_(1000),
+    inter_pkg_delay_(0),
     frame_transmission_delay_(0),
     shutter_mode_(SM_DEFAULT),
     auto_flash_(false),
@@ -344,14 +344,14 @@ void PylonROS2CameraParameter::readFromRosParameterServer(rclcpp::Node& nh)
     nh.get_parameter("auto_exposure_upper_limit", this->auto_exposure_upper_limit_);
 
     // mtu_size
-    RCLCPP_DEBUG(LOGGER, "---> gige/mtu_size");
+    RCLCPP_DEBUG(LOGGER, "---> mtu_size");
     
-    if (!nh.has_parameter("gige/mtu_size"))
+    if (!nh.has_parameter("mtu_size"))
     {
-        nh.declare_parameter<int>("gige/mtu_size", 3000);
+        nh.declare_parameter<int>("mtu_size", 1500);
     }
     
-    nh.get_parameter("gige/mtu_size", this->mtu_size_);
+    nh.get_parameter("mtu_size", this->mtu_size_);
 
     // enable_status_publisher
     RCLCPP_DEBUG(LOGGER, "---> enable_status_publisher");
@@ -384,24 +384,24 @@ void PylonROS2CameraParameter::readFromRosParameterServer(rclcpp::Node& nh)
     nh.get_parameter("startup_user_set", this->startup_user_set_);
 
     // inter_pkg_delay
-    RCLCPP_DEBUG(LOGGER, "---> gige/inter_pkg_delay");
+    RCLCPP_DEBUG(LOGGER, "---> inter_pkg_delay");
     
-    if (!nh.has_parameter("gige/inter_pkg_delay"))
+    if (!nh.has_parameter("inter_pkg_delay"))
     {
-        nh.declare_parameter<int>("gige/inter_pkg_delay", 1000);
+        nh.declare_parameter<int>("inter_pkg_delay", 0);
     }
     
-    nh.get_parameter("gige/inter_pkg_delay", this->inter_pkg_delay_);
+    nh.get_parameter("inter_pkg_delay", this->inter_pkg_delay_);
 
     // frame_transmission_delay
-    RCLCPP_DEBUG(LOGGER, "---> gige/frame_transmission_delay");
+    RCLCPP_DEBUG(LOGGER, "---> frame_transmission_delay");
     
-    if (!nh.has_parameter("gige/frame_transmission_delay"))
+    if (!nh.has_parameter("frame_transmission_delay"))
     {
-        nh.declare_parameter<int>("gige/frame_transmission_delay", 0);
+        nh.declare_parameter<int>("frame_transmission_delay", 0);
     }
     
-    nh.get_parameter("gige/frame_transmission_delay", this->frame_transmission_delay_);
+    nh.get_parameter("frame_transmission_delay", this->frame_transmission_delay_);
 
     // shutter mode
     RCLCPP_DEBUG(LOGGER, "---> shutter_mode");

@@ -910,7 +910,6 @@ bool PylonROS2CameraNode::startGrabbing()
 void PylonROS2CameraNode::spin()
 {
   // TODO: free run, test with parameter access
-  // TODO: https://docs.baslerweb.com/pylonapi/cpp/sample_code#grab
 
   // TODO: take into account the maximum frame rate that can be reached (or is it before?)
   // TODO: do some testing when software trigger, when we lose frames
@@ -923,10 +922,12 @@ void PylonROS2CameraNode::spin()
   // TODO: rename spin function into spinning thread
   // TODO: remove comments
   // TODO: documentation
+  // TODO: TriggerSoftware.Execute() to check
+  // TODO: faire des get services pour trigger selector, source and mode
+  // TODO: trigger selector, source and mode: rajouter les posibilites en terme de valeurs possibles
 
   double frame_step = 1.0 / this->frameRate();
-  std::cout << this->frameRate() << " " << frame_step << std::endl;
-  // 41.5973 0.02404
+  // std::cout << this->frameRate() << " " << frame_step << std::endl; // 41.5973 0.02404 with my camera
 
   while (!this->stop_spinning_ && rclcpp::ok())
   {
@@ -965,8 +966,7 @@ void PylonROS2CameraNode::spin()
     }
 
     // grab
-    std::cout << ">>> GRAB" << std::endl;
-    //std::this_thread::sleep_for(std::chrono::duration<double>(0.02));
+    RCLCPP_DEBUG(LOGGER, ">>> NEW GRAB");
 
     if (!this->pylon_camera_->isBlaze())
     {
@@ -984,9 +984,8 @@ void PylonROS2CameraNode::spin()
       // compute grab time
       double grab_time = rclcpp::Clock().now().seconds();
       tdiff = grab_time - start_time;
-      //std::cout << tdiff << std::endl;
       double grab_frame_rate = 1.0 / tdiff;
-      std::cout << "Grabbing frame rate: " << grab_frame_rate << std::endl;
+      RCLCPP_DEBUG_STREAM(LOGGER, "Grabbing frame rate: " << grab_frame_rate);
 
       // publish if subscribers
       if (this->img_raw_pub_.getNumSubscribers() > 0)
@@ -1052,9 +1051,8 @@ void PylonROS2CameraNode::spin()
         // compute grab time
         double grab_time = rclcpp::Clock().now().seconds();
         tdiff = grab_time - start_time;
-        //std::cout << tdiff << std::endl;
         double grab_frame_rate = 1.0 / tdiff;
-        std::cout << "Grabbing frame rate: " << grab_frame_rate << std::endl;
+        RCLCPP_DEBUG_STREAM(LOGGER, "Grabbing frame rate: " << grab_frame_rate);
 
         RCLCPP_INFO_STREAM_ONCE(LOGGER, "Camera frame from parameter server: " << this->pylon_camera_parameter_set_.cameraFrame());
         
@@ -1095,9 +1093,8 @@ void PylonROS2CameraNode::spin()
     // compute real frame rate, taking into account grabbing and other processes
     double loop_it_time = rclcpp::Clock().now().seconds();
     tdiff = loop_it_time - start_time;
-    //std::cout << tdiff << std::endl;
     double loop_frame_rate = 1.0 / tdiff;
-    std::cout << "Loop frame rate: " << loop_frame_rate << std::endl;
+    RCLCPP_DEBUG_STREAM(LOGGER, "Loop frame rate: " << loop_frame_rate);
 
     // the user has set a frame rate - wait accordingly to respect it
     if (tdiff > 0)  // just in case of but should never happen
@@ -1110,7 +1107,7 @@ void PylonROS2CameraNode::spin()
     double check_loop_it_time = rclcpp::Clock().now().seconds();
     tdiff = check_loop_it_time - start_time;
     double check_frame_rate = 1.0 / tdiff;
-    std::cout << "Check frame rate: " << check_frame_rate << std::endl;
+    RCLCPP_DEBUG_STREAM(LOGGER, "Check frame rate: " << check_frame_rate);
   }
 
   std::cout << "Spinning loop is stopped" << std::endl;
