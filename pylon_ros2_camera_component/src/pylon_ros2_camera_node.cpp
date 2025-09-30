@@ -736,6 +736,12 @@ bool PylonROS2CameraNode::startGrabbing()
   this->setupInitialCameraInfo(initial_cam_info);
   this->camera_info_manager_->setCameraInfo(initial_cam_info);
 
+  RCLCPP_INFO_STREAM(LOGGER, "Current ROI (x_offset, y_offset, height, width): "
+                              << this->pylon_camera_->currentROI().x_offset << ", "
+                              << this->pylon_camera_->currentROI().y_offset << ", "
+                              << this->pylon_camera_->currentROI().height << ", "
+                              << this->pylon_camera_->currentROI().width);
+
   if (!this->pylon_camera_->isBlaze())
   {
     if (this->pylon_camera_parameter_set_.cameraInfoURL().empty() || 
@@ -1496,33 +1502,37 @@ bool PylonROS2CameraNode::setROI(const sensor_msgs::msg::RegionOfInterest target
   }
 
   std::lock_guard<std::recursive_mutex> lock(this->grab_mutex_);
-  if (!this->pylon_camera_->setROI(target_roi, reached_roi) )
+  if (!this->pylon_camera_->setROI(target_roi, reached_roi))
   {
-    // retry till timeout
-    rclcpp::Rate r(10.0);
-    rclcpp::Time timeout(rclcpp::Node::now() + std::chrono::duration<double>(2));
-    while (rclcpp::ok())
-    {
-      if (this->pylon_camera_->setROI(target_roi, reached_roi))
-      {
-        break;
-      }
+    RCLCPP_ERROR_STREAM(LOGGER, "Error in setROI(): Unable to set target roi");
+    return false;
 
-      if (rclcpp::Node::now() > timeout)
-      {
-        RCLCPP_ERROR_STREAM(LOGGER, "Error in setROI(): Unable to set target roi before timeout");
-        sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();
-        cam_info.roi = this->pylon_camera_->currentROI();
-        this->camera_info_manager_->setCameraInfo(cam_info);
-        this->img_raw_msg_.width = this->pylon_camera_->imageCols();
-        this->img_raw_msg_.height = this->pylon_camera_->imageRows();
-        // step = full row length in bytes, img_size = (step * rows), imagePixelDepth
-        // already contains the number of channels
-        this->img_raw_msg_.step = this->img_raw_msg_.width * this->pylon_camera_->imagePixelDepth();
-        return false;
-      }
-      r.sleep();
-    }
+    // useful?
+    // retry till timeout
+    // rclcpp::Rate r(10.0);
+    // rclcpp::Time timeout(rclcpp::Node::now() + std::chrono::duration<double>(2));
+    // while (rclcpp::ok())
+    // {
+    //   if (this->pylon_camera_->setROI(target_roi, reached_roi))
+    //   {
+    //     break;
+    //   }
+
+    //   if (rclcpp::Node::now() > timeout)
+    //   {
+    //     RCLCPP_ERROR_STREAM(LOGGER, "Error in setROI(): Unable to set target roi before timeout");
+    //     sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();
+    //     cam_info.roi = this->pylon_camera_->currentROI();
+    //     this->camera_info_manager_->setCameraInfo(cam_info);
+    //     this->img_raw_msg_.width = this->pylon_camera_->imageCols();
+    //     this->img_raw_msg_.height = this->pylon_camera_->imageRows();
+    //     // step = full row length in bytes, img_size = (step * rows), imagePixelDepth
+    //     // already contains the number of channels
+    //     this->img_raw_msg_.step = this->img_raw_msg_.width * this->pylon_camera_->imagePixelDepth();
+    //     return false;
+    //   }
+    //   r.sleep();
+    // }
   }
 
   sensor_msgs::msg::CameraInfo cam_info = this->camera_info_manager_->getCameraInfo();

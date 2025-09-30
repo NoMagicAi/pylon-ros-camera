@@ -2,6 +2,10 @@
 Changelog for package pylon_ros2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.1.1 (2025-09-30)
+-------------------
+* Few fix and additional displayed information related to the ROI setting
+
 3.1.0 (2025-09-01)
 -------------------
 * Enabling both free run and software triggering
