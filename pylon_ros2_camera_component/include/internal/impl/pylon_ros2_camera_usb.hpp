@@ -90,20 +90,24 @@ bool PylonROS2USBCamera::applyCamSpecificStartupSettings(const PylonROS2CameraPa
 {
     try
     {
-        //cam_->StartGrabbing();
         grabbingStarting();
         cam_->StopGrabbing();
 
         RCLCPP_INFO_STREAM(LOGGER_USB, "Startup user profile set to \"" << parameters.startup_user_set_ << "\"");
+
         if (parameters.startup_user_set_ == "Default")
         {
-            // Remove all previous settings (sequencer etc.)
-            // Default Setting = Free-Running
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_Default);
             cam_->UserSetLoad.Execute();
+            
             // UserSetSelector_Default overrides Software Trigger Mode !!
-            cam_->TriggerSource.SetValue(Basler_UniversalCameraParams::TriggerSource_Software);
-            cam_->TriggerMode.SetValue(Basler_UniversalCameraParams::TriggerMode_On);
+
+            // by default free run but ready to software trigger
+            RCLCPP_INFO(LOGGER_USB, "Setting Free Run acquisition (AcquisitionMode = Continuous, TriggerSelector = FrameStart, TriggerMode = Off)");
+            cam_->AcquisitionMode.SetValue(Basler_UniversalCameraParams::AcquisitionMode_Continuous);
+            cam_->TriggerSelector.SetValue(Basler_UniversalCameraParams::TriggerSelector_FrameStart);
+            cam_->TriggerSource.SetValue(Basler_UniversalCameraParams::TriggerSource_Software);         // getting ready for software triggering
+            cam_->TriggerMode.SetValue(Basler_UniversalCameraParams::TriggerMode_Off);
 
             /* Thresholds for the AutoExposure Functions:
             *  - lower limit can be used to get rid of changing light conditions
@@ -135,12 +139,23 @@ bool PylonROS2USBCamera::applyCamSpecificStartupSettings(const PylonROS2CameraPa
                 RCLCPP_WARN_STREAM(LOGGER_USB, "Problem when trying to set the camera AutoExposure thresholds: Problem with variable ID.");
             }
 
-            cam_->AutoGainLowerLimit.SetValue(cam_->Gain.GetMin());
-            cam_->AutoGainUpperLimit.SetValue(cam_->Gain.GetMax());
-
             // The gain auto function and the exposure auto function can be used at the same time. In this case,
             // however, you must also set the Auto Function Profile feature.
             //  cam_->AutoFunctionProfile.SetValue(Basler_UniversalCameraParams::AutoFunctionProfile_MinimizeGain);
+            cam_->AutoGainLowerLimit.SetValue(cam_->Gain.GetMin());
+            cam_->AutoGainUpperLimit.SetValue(cam_->Gain.GetMax());
+            RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has gain range: [" << cam_->Gain.GetMin()
+                << " - " << cam_->Gain.GetMax()
+                << "] measured in dB.");
+            
+            RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has gammma range: ["
+                << cam_->Gamma.GetMin() << " - "
+                << cam_->Gamma.GetMax() << "].");
+    
+            RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has pylon auto brightness range: ["
+                << cam_->AutoTargetBrightness.GetMin() * 255 << " - "
+                << cam_->AutoTargetBrightness.GetMax() * 255
+                << "] which is the average pixel intensity.");
 
             if ( GenApi::IsAvailable(cam_->BinningHorizontal) &&
                  GenApi::IsAvailable(cam_->BinningVertical) )
@@ -156,54 +171,27 @@ bool PylonROS2USBCamera::applyCamSpecificStartupSettings(const PylonROS2CameraPa
                 RCLCPP_INFO_STREAM(LOGGER_USB, "Cam does not support binning.");
             }
 
-            if (GenApi::IsAvailable(cam_->ExposureTimeAbs))
-            {
-                RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has exposure time range: ["
-                    << cam_->ExposureTimeAbs.GetMin()
-                    << " - " << cam_->ExposureTimeAbs.GetMax()
-                    << "] measured in microseconds.");
-            }
-            else if (GenApi::IsAvailable(cam_->ExposureTime))
-            {
-                RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has exposure time range: ["
-                    << cam_->ExposureTime.GetMin()
-                    << " - " << cam_->ExposureTime.GetMax()
-                    << "] measured in microseconds.");
-            }
-            else
-            {
-                RCLCPP_WARN_STREAM(LOGGER_USB, "Problem when trying to display the camera exposure values: Problem with variable ID.");
-            }
-
-            RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has gain range: [" << cam_->Gain.GetMin()
-                    << " - " << cam_->Gain.GetMax()
-                    << "] measured in dB.");
-            RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has gammma range: ["
-                    << cam_->Gamma.GetMin() << " - "
-                    << cam_->Gamma.GetMax() << "].");
-            RCLCPP_INFO_STREAM(LOGGER_USB, "Cam has pylon auto brightness range: ["
-                    << cam_->AutoTargetBrightness.GetMin() * 255 << " - "
-                    << cam_->AutoTargetBrightness.GetMax() * 255
-                    << "] which is the average pixel intensity.");
-            
             RCLCPP_INFO(LOGGER_USB, "Default user setting loaded");
         }
         else if (parameters.startup_user_set_ == "UserSet1")
         {
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_UserSet1);
             cam_->UserSetLoad.Execute();
+            
             RCLCPP_INFO(LOGGER_USB, "UserSet1 loaded");
         }
         else if (parameters.startup_user_set_ == "UserSet2")
         {
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_UserSet2);
             cam_->UserSetLoad.Execute();
+            
             RCLCPP_INFO(LOGGER_USB, "UserSet2 loaded");
         }
         else if (parameters.startup_user_set_ == "UserSet3")
         {
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_UserSet3);
             cam_->UserSetLoad.Execute();
+            
             RCLCPP_INFO(LOGGER_USB, "UserSet3 loaded");
         }
         else if (parameters.startup_user_set_ == "CurrentSetting")
@@ -250,6 +238,7 @@ bool PylonROS2USBCamera::applyCamSpecificStartupSettings(const PylonROS2CameraPa
     {
         RCLCPP_ERROR_STREAM(LOGGER_USB, "Error applying camera specific startup setting for USB cameras: "
                 << e.GetDescription());
+
         return false;
     }
     return true;

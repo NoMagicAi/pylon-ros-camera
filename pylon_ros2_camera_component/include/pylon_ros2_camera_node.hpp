@@ -1823,7 +1823,8 @@ protected:
   rclcpp_action::Server<GrabBlazeDataAction>::SharedPtr grab_blaze_data_as_;
 
   // spinning thread
-  rclcpp::TimerBase::SharedPtr timer_;
+  std::thread spin_thread_;
+  std::atomic<bool> stop_spinning_;
   // mutex
   std::recursive_mutex grab_mutex_;
 

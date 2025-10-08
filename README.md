@@ -81,22 +81,37 @@ Beware that some parameters implemented by the driver, like for instance the par
 
 ### Acquisition mode and frame rate
 
-_From driver version 3.1.0, enabling free run is now possible. Please check out [the dedicated branch](https://github.com/basler/pylon-ros-camera/tree/jazzy_3.0.4_freerun) implementing this feature (only for Jazzy and beta version). Beware that even if the API stays unchanged, some default parameters have been changed, which may result in expected behaviors from the system and user end._
+From version 3.1.0, the driver allows free run as well as sequentially triggered acquisition by software trigger.
 
-The driver uses **software triggering** to acquire images. This sequential triggering approach inherently limits the achievable frame rate and makes it **impossible** to reach the camera's maximum frame rate achievable with free-run or hardware-triggered acquisition modes. Currently, the driver **does not support** switching to free-run or hardware-triggered acquisition mode.
+When starting the driver, the maximum acquisition frame rate that can be reached according to the current camera settings is displayed (for further information, please refer to the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate)). If this frame rate is lower than the one specified in the driver configuration file, the latter is updated accordingly. Except for the blaze, it is not possible to change the acquisition frame rate when the driver is running.
 
-At driver startup, the maximum achievable frame rate with the current camera settings and software triggering is calculated and logged (for further information, please refer to the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate)). If this value is lower than the frame rate specified in the launch or configuration file, the configured frame rate will be automatically adjusted to the achievable value. Note that this behavior does not apply to the blaze camera, where frame rate adjustment during runtime may be supported.
+Free run acquisition is set when the driver starts and loads the `Default` user set. Otherwise, if another user set is loaded, including `CurrentSetting`, the driver does not modify any parameter related to the acqusition, keeping the ones defined by the user. Setting a specific user set can be specified in the driver launch file. By default, the driver load the `CurrentSetting` user set.
 
-To increase the acquisition frame rate when using the driver, consider the following measures when possible and applicable:
-- Use a lower-bandwidth image encoding (e.g., Mono8 or BayerRG8)
-- Define a smaller region of interest (ROI)
-- Reduce the exposure time
-- Set the ``enable_current_params_publisher`` parameter to false (it is set to false by default)
-- Follow performance recommendations in the official [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate).
-- For advanced use cases, comment or optimize the operations executed in ``PylonROS2CameraNode::spin()``. In addition to grabbing, it checks if the camera is disconnected, publishes images and current settings if there are some subscribers, rectifies images if calibration parameters are available, etc.). Be aware though that the frame rate increase may not be significant and that these changes may affect driver stability and compatibility.
+- Free run is enabled by setting the following parameters:
+```
+AcquisitionMode = Continuous
+TriggerSelector = FrameStart
+TriggerMode = Off
+```
+- Software triggering is enabled by setting the following parameters:
+```
+TriggerSelector = FrameStart
+TriggerSource = Software
+TriggerMode = On
+```
+More information about acquisition modes can be found [here](https://docs.baslerweb.com/acquisition-mode). The driver does not currently give access to the `AcquisitionMode` parameter and if the `TriggerSource` parameter is not modified, switching from free run to software triggering can be done by setting the `TriggerMode` parameter from `Off` to `On`, and vice versa.
+
+Generally speaking, to increase the acquisition frame rate when using the driver, consider when possible and applicable:
+- Switch to free run.
+- Changing the image encoding to Bayer or Mono ones.
+- Setting a region of interest.
+- Decreasing the exposure time.
+- Decreasing the inter-packet delay and setting it to 0 if possible.
+- Setting the ``enable_current_params_publisher`` parameter to false (it is set to false by default).
+- Following the additional suggestions specified in the [Basler documentation](https://docs.baslerweb.com/resulting-acquisition-frame-rate).
+- Commenting and modifying the different operations executed in ``PylonROS2CameraNode::spin()``. In addition to grabbing, it checks if the camera is disconnected, publishes images and current settings if there are some subscribers, rectifies images if calibration parameters are available, etc. Beware though that the frame rate increase will not be significant and that the standard driver behaviors will not be guaranteed.
 
 The interested readers can refer to the following discussions for more information: [#21](https://github.com/basler/pylon-ros-camera/issues/21), [#28](https://github.com/basler/pylon-ros-camera/issues/28), [#29](https://github.com/basler/pylon-ros-camera/issues/29), [#81](https://github.com/basler/pylon-ros-camera/issues/81), [#116](https://github.com/basler/pylon-ros-camera/issues/116), [#147](https://github.com/basler/pylon-ros-camera/issues/147), [#200](https://github.com/basler/pylon-ros-camera/issues/200).
-Feel free to reach out and submit pull requests if you are implementing suitable ways to acquire images in a continuous way or through hardware trigger. We will make sure to review them and integrate them if relevant.
 
 ### Image pixel encoding (not for the blaze)
 
@@ -218,14 +233,14 @@ The following settings do **NOT** have to be set. Each camera has default values
 - **auto_exposure_upper_limit (not for the blaze)**  
   The exposure search can be limited with an upper bound. This is to prevent very high exposure times and resulting timeouts. A typical value for this upper bound is ~2000000us. Beware that this upper limit is only set if `startup_user_set` is set to `Default`.  
 
-- **gige/mtu_size (not for the blaze)**  
+- **mtu_size (not for the blaze)**  
   The MTU size. Only used for GigE cameras. To prevent lost frames configure the camera has to be configured with the MTU size the network card supports. A value greater 3000 should be good (1500 for single-board computer)
 
-- **gige/inter_pkg_delay (not for the blaze)**  
-  The inter-packet delay in ticks. Only used for GigE cameras. To prevent lost frames it should be greater than 0. For most of GigE cameras, a value of 1000 is reasonable. For GigE cameras used on single-board computer, this value should be set to 11772.
+- **inter_pkg_delay (not for the blaze)**  
+  The inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation. Generally needs to modified if more than one cameras is involved or if hardware is not performing well. Raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed': https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras. For most of GigE cameras, a value of 1000 is reasonable. For cameras used on a single-board computer this value should be set to 11772. Beware that the inter-packet delay decrease will result in frame rate reduction.
 
-- **gige/frame_transmission_delay (not for the blaze)**  
- In most cases, this parameter should be set to 0. However, if your network hardware can't handle spikes in network traffic (e.g., if you are triggering multiple camera simultaneously), you can use the frame transmission delay parameter to stagger the start of image data transmissions from each camera.
+- **frame_transmission_delay (not for the blaze)**  
+  In most cases, this parameter should be set to 0. However, if your network hardware can't handle spikes in network traffic (e.g., if you are triggering multiple camera simultaneously), you can use the frame transmission delay parameter to stagger the start of image data transmissions from each camera.
 
 - **auto_flash (not for the blaze)**  
   Flag that indicates if the camera has a flash connected, which should be on exposure. Only supported for GigE cameras. Default: false.
@@ -493,6 +508,8 @@ To increase performance and to minimize CPU usage when grabbing images, the foll
 
 Please refer to the [dedicated chapter](https://github.com/basler/pylon-ros-camera/edit/jazzy/README.md#acquisition-mode-and-frame-rate) in this documentation for more information.
 
+Beware as well that starting rviz2 or rqt before the driver may result in a slower frame rate. Start the driver starts followed by rqt or rviz2.
+
 ### No connection with connected camera (GigE devices)
 
 To be sure to be able to connect to a specific camera, its network configuration must be manually set through Basler's pylon IP configurator. To do so, click on the camera in the list of connected devices, select the `Static IP` option, set an `IP Address` within the same range as the one of your computer, and set the same `Subnet Mask` as the one from your computer.
@@ -519,8 +536,8 @@ It is possible to change the packet size by changing the default value of the `m
 
 The GigE Vision implementation of Basler pylon software uses a thread for receiving image data. Basler pylon tries to set the thread priority for the receive thread to real-time thread priority. This requires certain permissions. The 'Permissions for Real-time Thread Priorities' section of the pylon INSTALL document describes how to grant the required permissions.
 
-#### Increasing Packet Size (U3V devices)
+#### Increase Packet Size (U3V devices)
 
-For faster USB transfers you should increase the packet size. You can do this by changing the "Stream Parameters" -> "Maximum Transfer Size" value from inside the pylon Viewer or by setting the corresponding value via the API. After increasing the package size you will likely run out of kernel space and see corresponding error messages on the console. The default value set by the kernel is 16 MB. To set the value (in this example to 1000 MB) you can execute as root:
+For faster USB transfers you should increase the packet size. You can do this by changing the "Stream Parameters" -> "Maximum Transfer Size" value from inside the pylon Viewer or by setting the corresponding value via the API. After increasing the packet size you will likely run out of kernel space and see corresponding error messages on the console. The default value set by the kernel is 16 MB. To set the value (in this example to 1000 MB) you can execute as root:
 `echo 1000 > /sys/module/usbcore/parameters/usbfs_memory_mb`
 This would assign a maximum of 1000 MB to the USB stack.

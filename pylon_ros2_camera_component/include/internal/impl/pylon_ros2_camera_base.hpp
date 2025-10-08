@@ -427,6 +427,7 @@ bool PylonROS2CameraImpl<CameraTrait>::grab(std::vector<uint8_t>& image, rclcpp:
         RCLCPP_ERROR(LOGGER_BASE, "Error: Grab was not successful");
         return false;
     }
+    
     const uint8_t *pImageBuffer = reinterpret_cast<uint8_t*>(ptr_grab_result->GetBuffer());
 
     // ------------------------------------------------------------------------
@@ -865,54 +866,50 @@ bool PylonROS2CameraImpl<CameraTraitT>::setROI(const sensor_msgs::msg::RegionOfI
 
     try
     {
-        if ( GenApi::IsAvailable(cam_->Width) && GenApi::IsAvailable(cam_->Height) && GenApi::IsAvailable(cam_->OffsetX) && GenApi::IsAvailable(cam_->OffsetY))
+        if (GenApi::IsAvailable(cam_->Width) && GenApi::IsAvailable(cam_->Height) && GenApi::IsAvailable(cam_->OffsetX) && GenApi::IsAvailable(cam_->OffsetY))
         {
             cam_->StopGrabbing();
+
             int64_t max_image_width = cam_->WidthMax.GetValue();
             int64_t min_image_width = cam_->Width.GetMin();
             int64_t max_image_height = cam_->HeightMax.GetValue();
             int64_t min_image_height = cam_->Height.GetMin();
             int64_t width_inc = cam_->Width.GetInc();
             int64_t height_inc = cam_->Height.GetInc();
+
             // reset roi to avoid exceptions while setting Width and Height values
             cam_->OffsetX.SetValue(0);
             cam_->OffsetY.SetValue(0);
             cam_->Width.SetValue(max_image_width);
             cam_->Height.SetValue(max_image_height);
+
+            // useful?
             // Force minimum increment of 2 as some cameras wrongly declare that
             // they have an increment of 1 while it is 2
-            if (height_inc == 1)
-                height_inc = 2;
-            if (width_inc == 1)
-                width_inc = 2;
+            // if (height_inc == 1)
+            //     height_inc = 2;
+            // if (width_inc == 1)
+            //     width_inc = 2;
 
             if (width_to_set > max_image_width)
             {
-                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired width("
-                        << width_to_set << ") unreachable! Setting to upper "
-                        << "limit: " << max_image_width);
+                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired width(" << width_to_set << ") unreachable! Setting to upper " << "limit: " << max_image_width);
                 width_to_set = max_image_width;
             }
             else if (width_to_set < min_image_width)
             {
-                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired width("
-                        << width_to_set << ") unreachable! Setting to lower "
-                        << "limit: " << min_image_width);
+                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired width(" << width_to_set << ") unreachable! Setting to lower " << "limit: " << min_image_width);
                 width_to_set = min_image_width;
             }
 
             if (height_to_set > max_image_height)
             {
-                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired height("
-                        <<height_to_set << ") unreachable! Setting to upper "
-                        << "limit: " << max_image_height);
+                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired height(" << height_to_set << ") unreachable! Setting to upper " << "limit: " << max_image_height);
                 height_to_set = max_image_height;
             }
             else if (height_to_set < min_image_height)
             {
-                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired height("
-                        << height_to_set << ") unreachable! Setting to lower "
-                        << "limit: " << min_image_height);
+                RCLCPP_WARN_STREAM(LOGGER_BASE, "Desired height(" << height_to_set << ") unreachable! Setting to lower " << "limit: " << min_image_height);
                 height_to_set = min_image_height;
             }
             if (offset_x_to_set % width_inc != 0)
@@ -959,8 +956,8 @@ bool PylonROS2CameraImpl<CameraTraitT>::setROI(const sensor_msgs::msg::RegionOfI
             cam_->OffsetX.SetValue(offset_x_to_set);
             cam_->OffsetY.SetValue(offset_y_to_set);
             reached_roi = currentROI();
+
             grabbingStarting();
-            //cam_->StartGrabbing();
 
             img_cols_ = static_cast<size_t>(cam_->Width.GetValue());
             img_rows_ = static_cast<size_t>(cam_->Height.GetValue());
@@ -974,8 +971,7 @@ bool PylonROS2CameraImpl<CameraTraitT>::setROI(const sensor_msgs::msg::RegionOfI
         }
         else
         {
-            RCLCPP_WARN_STREAM(LOGGER_BASE, "Camera does not support area of interest. Will keep the "
-                    << "current settings");
+            RCLCPP_WARN(LOGGER_BASE, "Camera does not support area of interest. Will keep the current settings");
             reached_roi = currentROI();
         }
     }
@@ -986,6 +982,7 @@ bool PylonROS2CameraImpl<CameraTraitT>::setROI(const sensor_msgs::msg::RegionOfI
                 << height_to_set << ", " << offset_x_to_set << ", " << offset_y_to_set <<
                 ") occurred: "
                 << e.GetDescription());
+
         return false;
     }
 
@@ -2036,7 +2033,8 @@ template <typename CameraTraitT>
 std::string PylonROS2CameraImpl<CameraTraitT>::setTriggerMode(const bool& value)
 {
     try
-    {   if ( GenApi::IsAvailable(cam_->TriggerMode) )
+    {   
+        if (GenApi::IsAvailable(cam_->TriggerMode))
         {
             if (value)
             {
@@ -2054,11 +2052,12 @@ std::string PylonROS2CameraImpl<CameraTraitT>::setTriggerMode(const bool& value)
         }
 
     }
-    catch ( const GenICam::GenericException &e )
+    catch (const GenICam::GenericException &e)
     {
         RCLCPP_ERROR_STREAM(LOGGER_BASE, "An exception while setting the trigger mode occurred:" << e.GetDescription());
         return e.GetDescription();
     }
+
     return "done";
 }
 

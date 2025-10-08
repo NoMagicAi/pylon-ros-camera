@@ -156,27 +156,30 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
 {
     try
     {
-        //cam_->StartGrabbing();
         grabbingStarting();
         cam_->StopGrabbing();
 
         RCLCPP_INFO_STREAM(LOGGER_GIGE, "Startup user profile set to \"" << parameters.startup_user_set_ << "\"");
+
         if (parameters.startup_user_set_ == "Default")
         {
-            // Remove all previous settings (sequencer etc.)
-            // Default Setting = Free-Running
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_Default);
             cam_->UserSetLoad.Execute();
 
             // UserSetSelector_Default overrides Software Trigger Mode !!
-            cam_->TriggerSource.SetValue(Basler_UniversalCameraParams::TriggerSource_Software);
-            cam_->TriggerMode.SetValue(Basler_UniversalCameraParams::TriggerMode_On);
+
+            // by default free run but ready to software trigger
+            RCLCPP_INFO(LOGGER_GIGE, "Setting Free Run acquisition (AcquisitionMode = Continuous, TriggerSelector = FrameStart, TriggerMode = Off)");
+            cam_->AcquisitionMode.SetValue(Basler_UniversalCameraParams::AcquisitionMode_Continuous);
+            cam_->TriggerSelector.SetValue(Basler_UniversalCameraParams::TriggerSelector_FrameStart);
+            cam_->TriggerSource.SetValue(Basler_UniversalCameraParams::TriggerSource_Software);         // getting ready for software triggering
+            cam_->TriggerMode.SetValue(Basler_UniversalCameraParams::TriggerMode_Off);
 
             /* Thresholds for the AutoExposure Functions:
-                *  - lower limit can be used to get rid of changing light conditions
-                *    due to 50Hz lamps (-> 20ms cycle duration)
-                *  - upper limit is to prevent motion blur
-                */
+            *  - lower limit can be used to get rid of changing light conditions
+            *    due to 50Hz lamps (-> 20ms cycle duration)
+            *  - upper limit is to prevent motion blur
+            */
             if (GenApi::IsAvailable(cam_->ExposureTimeAbs))
             {
                 double upper_lim = std::min(parameters.auto_exposure_upper_limit_, cam_->ExposureTimeAbs.GetMax());
@@ -202,18 +205,41 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
                 RCLCPP_WARN_STREAM(LOGGER_GIGE, "Problem when trying to set the camera AutoExposure thresholds: Problem with variable ID.");
             }
 
-            //cam_->AutoGainRawLowerLimit.SetValue(cam_->GainRaw.GetMin());
-            //cam_->AutoGainRawUpperLimit.SetValue(cam_->GainRaw.GetMax());
+            RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has gain range: ["
+                    << cam_->GainRaw.GetMin() << " - "
+                    << cam_->GainRaw.GetMax()
+                    << "] measured in device specific units.");
+
+            // Check if gamma is available, print range
+            if (!GenApi::IsAvailable(cam_->Gamma))
+            {
+                RCLCPP_WARN(LOGGER_GIGE, "Cam gamma not available, will keep the default (auto).");
+            }
+            else
+            {
+                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has gamma range: ["
+                    << cam_->Gamma.GetMin() << " - "
+                    << cam_->Gamma.GetMax() << "].");
+            }
 
             // The gain auto function and the exposure auto function can be used at the
-            // same time. In this case, however, you must also set the
-            // Auto Function Profile feature.
-            // acA1920-40gm does not support Basler_UniversalCameraParams::GainSelector_AnalogAll
-            // has Basler_UniversalCameraParams::GainSelector_All instead
-            // cam_->GainSelector.SetValue(Basler_UniversalCameraParams::GainSelector_AnalogAll);
+            // same time. In this case, however, you must also set the Auto Function Profile feature.
+            if (GenApi::IsAvailable(cam_->AutoTargetValue))
+            {
+                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has pylon auto brightness range: ["
+                    << cam_->AutoTargetValue.GetMin() << " - "
+                    << cam_->AutoTargetValue.GetMax()
+                    << "] which is the average pixel intensity.");
+            } 
+            else if (GenApi::IsAvailable(cam_->AutoTargetBrightness))
+            {
+                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has pylon auto brightness range: ["
+                    << cam_->AutoTargetBrightness.GetMin() << " - "
+                    << cam_->AutoTargetBrightness.GetMax()
+                    << "] which is the average pixel intensity.");
+            }
 
-            if ( GenApi::IsAvailable(cam_->BinningHorizontal) &&
-                    GenApi::IsAvailable(cam_->BinningVertical) )
+            if (GenApi::IsAvailable(cam_->BinningHorizontal) && GenApi::IsAvailable(cam_->BinningVertical))
             {
                 RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has binning range: x(hz) = ["
                         << cam_->BinningHorizontal.GetMin() << " - "
@@ -225,63 +251,25 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
             {
                 RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam does not support binning.");
             }
-
-            if (GenApi::IsAvailable(cam_->ExposureTimeAbs))
-            {
-                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has exposure time range: ["
-                    << cam_->ExposureTimeAbs.GetMin()
-                    << " - " << cam_->ExposureTimeAbs.GetMax()
-                    << "] measured in microseconds.");
-            }
-            else if (GenApi::IsAvailable(cam_->ExposureTime))
-            {
-                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has exposure time range: ["
-                    << cam_->ExposureTime.GetMin()
-                    << " - " << cam_->ExposureTime.GetMax()
-                    << "] measured in microseconds.");
-            }
-            else
-            {
-                RCLCPP_WARN_STREAM(LOGGER_GIGE, "Problem when trying to display the camera exposure values: Problem with variable ID.");
-            }
-
-            RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has gain range: ["
-                    << cam_->GainRaw.GetMin() << " - "
-                    << cam_->GainRaw.GetMax()
-                    << "] measured in device specific units.");
-
-            // Check if gamma is available, print range
-            if ( !GenApi::IsAvailable(cam_->Gamma) )
-            {
-                RCLCPP_WARN(LOGGER_GIGE, "Cam gamma not available, will keep the default (auto).");
-            }
-            else
-            {
-                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has gamma range: ["
-                    << cam_->Gamma.GetMin() << " - "
-                    << cam_->Gamma.GetMax() << "].");
-            }
-            if ( GenApi::IsAvailable(cam_->AutoTargetValue) )
-            {
-                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has pylon auto brightness range: ["
-                    << cam_->AutoTargetValue.GetMin() << " - "
-                    << cam_->AutoTargetValue.GetMax()
-                    << "] which is the average pixel intensity.");
-            } 
-            else if ( GenApi::IsAvailable(cam_->AutoTargetBrightness) )
-            {
-                RCLCPP_INFO_STREAM(LOGGER_GIGE, "Cam has pylon auto brightness range: ["
-                    << cam_->AutoTargetBrightness.GetMin() << " - "
-                    << cam_->AutoTargetBrightness.GetMax()
-                    << "] which is the average pixel intensity.");
-            }
             
-            // raise inter-package delay (GevSCPD) for solving error:
-            // 'the image buffer was incompletely grabbed'
-            // also in ubuntu settings -> network -> options -> MTU Size
+            // in ubuntu settings -> network -> options -> MTU Size
             // from 'automatic' to 3000 if card supports it
             // single-board computers have MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
+
+            // the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+            // generally needs to modified if more than one cameras is involved or if hardware is not performing well 
+            // raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+            // https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+            // for most of GigE cameras, a value of 1000 is reasonable
+            // for cameras used on a single-board computer this value should be set to 11772
+            // beware that the inter-packet delay decrease will result in frame rate reduction
+            if (parameters.inter_pkg_delay_ > 0)
+                RCLCPP_WARN_STREAM_ONCE(LOGGER_GIGE, "Inter-packet delay value is > 0 (=" << parameters.inter_pkg_delay_ << "). Beware that it may result in significant frame rate reduction.");
+            cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
+
+            // frame transmission delay
+            cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
 
             if (parameters.auto_flash_)
             {
@@ -294,16 +282,6 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
                 setAutoflash(flash_on_lines);
             }
 
-            // http://www.baslerweb.com/media/documents/AW00064902000%20Control%20Packet%20Timing%20With%20Delays.pdf
-            // inter package delay in ticks (? -> mathi said in nanosec) -> prevent lost frames
-            // package size * n_cams + 5% overhead = inter package size
-            // int n_cams = 1;
-            // int inter_package_delay_in_ticks = n_cams * imageSize() * 1.05;
-            cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
-
-            // frame transmission delay
-            cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
-
             RCLCPP_INFO(LOGGER_GIGE, "Default user setting loaded");
         }
         else if (parameters.startup_user_set_ == "UserSet1")
@@ -311,8 +289,23 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_UserSet1);
             cam_->UserSetLoad.Execute();
 
+            // in ubuntu settings -> network -> options -> MTU Size
+            // from 'automatic' to 3000 if card supports it
+            // single-board computers have MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
+
+            // the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+            // generally needs to modified if more than one cameras is involved or if hardware is not performing well 
+            // raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+            // https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+            // for most of GigE cameras, a value of 1000 is reasonable
+            // for cameras used on a single-board computer this value should be set to 11772
+            // beware that the inter-packet delay decrease will result in frame rate reduction
+            if (parameters.inter_pkg_delay_ > 0)
+                RCLCPP_WARN_ONCE(LOGGER_GIGE, "Inter-packet delay value is > 0. Beware that it may result in significant frame rate reduction.");
             cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
+
+            // frame transmission delay
             cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
 
             RCLCPP_INFO(LOGGER_GIGE, "UserSet1 loaded");
@@ -322,8 +315,23 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_UserSet2);
             cam_->UserSetLoad.Execute();
 
+            // in ubuntu settings -> network -> options -> MTU Size
+            // from 'automatic' to 3000 if card supports it
+            // single-board computers have MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
+
+            // the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+            // generally needs to modified if more than one cameras is involved or if hardware is not performing well 
+            // raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+            // https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+            // for most of GigE cameras, a value of 1000 is reasonable
+            // for cameras used on a single-board computer this value should be set to 11772
+            // beware that the inter-packet delay decrease will result in frame rate reduction
+            if (parameters.inter_pkg_delay_ > 0)
+                RCLCPP_WARN_ONCE(LOGGER_GIGE, "Inter-packet delay value is > 0. Beware that it may result in significant frame rate reduction.");
             cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
+
+            // frame transmission delay
             cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
 
             RCLCPP_INFO(LOGGER_GIGE, "UserSet2 loaded");
@@ -333,8 +341,23 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
             cam_->UserSetSelector.SetValue(Basler_UniversalCameraParams::UserSetSelector_UserSet3);
             cam_->UserSetLoad.Execute();
 
+            // in ubuntu settings -> network -> options -> MTU Size
+            // from 'automatic' to 3000 if card supports it
+            // single-board computers have MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
+
+            // the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+            // generally needs to modified if more than one cameras is involved or if hardware is not performing well 
+            // raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+            // https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+            // for most of GigE cameras, a value of 1000 is reasonable
+            // for cameras used on a single-board computer this value should be set to 11772
+            // beware that the inter-packet delay decrease will result in frame rate reduction
+            if (parameters.inter_pkg_delay_ > 0)
+                RCLCPP_WARN_ONCE(LOGGER_GIGE, "Inter-packet delay value is > 0. Beware that it may result in significant frame rate reduction.");
             cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
+
+            // frame transmission delay
             cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
 
             RCLCPP_INFO(LOGGER_GIGE, "UserSet3 loaded");
@@ -342,10 +365,10 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
         else if (parameters.startup_user_set_ == "CurrentSetting")
         {
             /* Thresholds for the AutoExposure Functions:
-                *  - lower limit can be used to get rid of changing light conditions
-                *    due to 50Hz lamps (-> 20ms cycle duration)
-                *  - upper limit is to prevent motion blur
-                */
+            *  - lower limit can be used to get rid of changing light conditions
+            *    due to 50Hz lamps (-> 20ms cycle duration)
+            *  - upper limit is to prevent motion blur
+            */
             if (GenApi::IsAvailable(cam_->ExposureTimeAbs))
             {
                 double upper_lim = std::min(parameters.auto_exposure_upper_limit_, cam_->ExposureTimeAbs.GetMax());
@@ -371,8 +394,23 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
                 RCLCPP_WARN_STREAM(LOGGER_GIGE, "Problem when trying to set the camera AutoExposure thresholds: Problem with variable ID.");
             }
 
+            // in ubuntu settings -> network -> options -> MTU Size
+            // from 'automatic' to 3000 if card supports it
+            // single-board computers have MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
+
+            // the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+            // generally needs to modified if more than one cameras is involved or if hardware is not performing well 
+            // raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+            // https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+            // for most of GigE cameras, a value of 1000 is reasonable
+            // for cameras used on a single-board computer this value should be set to 11772
+            // beware that the inter-packet delay decrease will result in frame rate reduction
+            if (parameters.inter_pkg_delay_ > 0)
+                RCLCPP_WARN_ONCE(LOGGER_GIGE, "Inter-packet delay value is > 0. Beware that it may result in significant frame rate reduction.");
             cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
+            
+            // frame transmission delay
             cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
 
             RCLCPP_INFO(LOGGER_GIGE, "CurrentSetting loaded");
@@ -381,8 +419,23 @@ bool PylonROS2GigECamera::applyCamSpecificStartupSettings(const PylonROS2CameraP
         {
             RCLCPP_WARN_STREAM(LOGGER_GIGE, "Unsupported startup user profile \"" << parameters.startup_user_set_ << "\", ignoring");
             
+            // in ubuntu settings -> network -> options -> MTU Size
+            // from 'automatic' to 3000 if card supports it
+            // single-board computers have MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
+
+            // the inter-packet delay in ticks to prevent frame loss, support the network bandwith priorisation
+            // generally needs to modified if more than one cameras is involved or if hardware is not performing well 
+            // raise inter-packet delay (GevSCPD) for solving error: 'the buffer was incompletely grabbed'
+            // https://docs.baslerweb.com/knowledge/troubleshooting-error-code-3774873620-0xe1000014-with-gige-cameras
+            // for most of GigE cameras, a value of 1000 is reasonable
+            // for cameras used on a single-board computer this value should be set to 11772
+            // beware that the inter-packet delay decrease will result in frame rate reduction
+            if (parameters.inter_pkg_delay_ > 0)
+                RCLCPP_WARN_ONCE(LOGGER_GIGE, "Inter-packet delay value is > 0. Beware that it may result in significant frame rate reduction.");
             cam_->GevSCPD.SetValue(parameters.inter_pkg_delay_);
+
+            // frame transmission delay
             cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
 
             RCLCPP_INFO(LOGGER_GIGE, "CurrentSetting loaded");
@@ -929,101 +982,6 @@ int PylonROS2GigECamera::getTriggerSelector()
     }
 }
 
-/*
-template <>
-std::string PylonROS2GigECamera::setTriggerSource(const int& source)
-{
-    try
-    {   if (GenApi::IsAvailable(cam_->TriggerSource))
-        {
-            switch (source)
-            {
-                case 0:
-                    cam_->TriggerSource.SetValue(TriggerSourceEnums::TriggerSource_Software);
-                    RCLCPP_INFO_STREAM(LOGGER_GIGE, "Trigger source: Software");
-                    break;
-                case 1:
-                    cam_->TriggerSource.SetValue(TriggerSourceEnums::TriggerSource_Line1);
-                    RCLCPP_INFO_STREAM(LOGGER_GIGE, "Trigger source: Line 1");
-                    break;
-                case 2:
-                    cam_->TriggerSource.SetValue(TriggerSourceEnums::TriggerSource_Line3);
-                    RCLCPP_INFO_STREAM(LOGGER_GIGE, "Trigger source: Line 3");
-                    break;
-                case 3:
-                    cam_->TriggerSource.SetValue(TriggerSourceEnums::TriggerSource_Line4);
-                    RCLCPP_INFO_STREAM(LOGGER_GIGE, "Trigger source: Line 4");
-                    break;
-                case 4:
-                    cam_->TriggerSource.SetValue(TriggerSourceEnums::TriggerSource_Action1);
-                    RCLCPP_INFO_STREAM(LOGGER_GIGE, "Trigger source: Action 1");
-                    break;
-                default:
-                    RCLCPP_ERROR_STREAM(LOGGER_GIGE, "Trigger source value is invalid! Please choose between 0 -> Trigger Software / 1 -> Line 1 / 2 -> Line 3 / 3 -> Line 4 / 4 -> Action 1");
-                    return "Error: unknown value for trigger source";
-            }
-        }
-        else 
-        {
-            RCLCPP_ERROR_STREAM(LOGGER_GIGE, "Error while trying to change the trigger source. The connected camera does not support this feature");
-            return "The connected camera does not support this feature";
-        }
-
-    }
-    catch (const GenICam::GenericException &e)
-    {
-        RCLCPP_ERROR_STREAM(LOGGER_GIGE, "An exception while setting the trigger source occurred:" << e.GetDescription());
-        return e.GetDescription();
-    }
-    return "done";
-}
-*/
-
-/*
-template <>
-int PylonROS2GigECamera::getTriggerSource()
-{
-    try
-    {   if ( GenApi::IsAvailable(cam_->TriggerSource) )
-        {
-            if (cam_->TriggerSource.GetValue() == TriggerSourceEnums::TriggerSource_Software)
-            {
-                return 0; // Software
-            }
-            else if (cam_->TriggerSource.GetValue() == TriggerSourceEnums::TriggerSource_Line1)
-            {
-                return 1; // Line1
-            }
-            else if (cam_->TriggerSource.GetValue() == TriggerSourceEnums::TriggerSource_Line3)
-            {
-                return 2; // Line3
-            }
-            else if (cam_->TriggerSource.GetValue() == TriggerSourceEnums::TriggerSource_Line4)
-            {
-                return 3; // Line4
-            }
-            else if (cam_->TriggerSource.GetValue() == TriggerSourceEnums::TriggerSource_Action1)
-            {
-                return 4 ; // Action1
-            }
-            else 
-            {
-                return -3; // Unknown
-            }
-        }
-        else 
-        {
-            return -1; // Not available
-        }
-
-    }
-    catch ( const GenICam::GenericException &e )
-    {
-        return -2; // Error
-    }
-}
-*/
-
 template <>
 std::string PylonROS2GigECamera::setTriggerDelay(const float& delayValue)
 {
@@ -1066,39 +1024,6 @@ float PylonROS2GigECamera::getTriggerDelay()
         return -20000.0; // Error
     }
 }
-
-// template <>
-// std::string PylonROS2GigECamera::setLineMode(const int& value)
-// {
-//     try
-//     {   if ( (cam_->LineFormat.GetValue() == LineFormatEnums::LineFormat_TTL) )
-//         {
-//             if (value == 0)
-//             {
-//                 cam_->LineMode.SetValue(LineModeEnums::LineMode_Input);
-//             }
-//             else if (value == 1)
-//             {
-//                 cam_->LineMode.SetValue(LineModeEnums::LineMode_Output);
-//             }
-//             else 
-//             {
-//                 return "Error: unknown value";
-//             }
-//         }
-//         else 
-//         {
-//             RCLCPP_ERROR_STREAM(LOGGER_GIGE, "Error : the selected line number dose not have change line mode feature");
-//             return "Error : the selected line number dose not have change line mode feature";
-//         }
-//     }
-//     catch ( const GenICam::GenericException &e )
-//     {
-//         RCLCPP_ERROR_STREAM(LOGGER_GIGE, "An exception while setting the line mode occurred:" << e.GetDescription());
-//         return e.GetDescription(); 
-//     }
-//     return "done";
-// }
 
 template <>
 std::string PylonROS2GigECamera::setLineDebouncerTime(const float& value)

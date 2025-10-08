@@ -2,6 +2,16 @@
 Changelog for package pylon_ros2_camera
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.1.1 (2025-09-30)
+-------------------
+* Few fixes and additional displayed information related to the ROI setting
+
+3.1.0 (2025-09-01)
+-------------------
+* Enabling both free run and software triggering
+* New way for the driver to spin
+* API stays unchanged but some default parameters have been changed, which may result in driver and system behaviors different from the expected ones
+
 3.0.4 (2025-07-08)
 -------------------
 * Include Boost (date_time component) as required when building
