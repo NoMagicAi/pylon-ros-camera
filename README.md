@@ -25,7 +25,7 @@ You are welcome to post any questions or issues on [GitHub](https://github.com/b
 
 This repository including the pylon ROS2 packages must be cloned in your workspace (e.g., `dev_ws` for instance):  
 ```
-cd ~/dev_ws/src && git clone -b jazzy_beta https://github.com/basler/pylon-ros-camera pylon_ros2_camera
+cd ~/dev_ws/src && git clone -b jazzy https://github.com/basler/pylon-ros-camera pylon_ros2_camera
 ```  
 
 Install the ROS2 dependencies required by the pylon ROS2 packages:  
@@ -506,7 +506,7 @@ To increase performance and to minimize CPU usage when grabbing images, the foll
 
 ### Slow frame rate
 
-Please refer to the [dedicated chapter](https://github.com/basler/pylon-ros-camera/edit/jazzy/README.md#acquisition-mode-and-frame-rate) in this documentation for more information.
+Please refer to the dedicated chapter ("Acquisition mode and frame rate") in this documentation for more information.
 
 Beware as well that starting rviz2 or rqt before the driver may result in a slower frame rate. Start the driver starts followed by rqt or rviz2.
 
