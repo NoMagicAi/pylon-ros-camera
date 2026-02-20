@@ -327,7 +327,14 @@ public:
     float white_balance_ratio_blue_;
 
     /**
-    * Camera grab strategy 
+    * Maximum number of consecutive grab failures before triggering
+    * a camera reconnection. Set to 0 to disable this feature.
+    * Default: 100 (~50s at 500ms grab timeout)
+    */
+    int max_consecutive_grab_failures_;
+
+    /**
+    * Camera grab strategy
     * 0 = GrabStrategy_OneByOne
     * 1 = GrabStrategy_LatestImageOnly
     * 2 = GrabStrategy_LatestImages

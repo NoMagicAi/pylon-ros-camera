@@ -68,6 +68,7 @@ PylonROS2CameraParameter::PylonROS2CameraParameter() :
     auto_flash_line_2_(true),
     auto_flash_line_3_(true),
     grab_timeout_(500),
+    max_consecutive_grab_failures_(100),
     trigger_timeout_(5000),
     white_balance_auto_(0),
     white_balance_ratio_red_(1.0),
@@ -470,6 +471,16 @@ void PylonROS2CameraParameter::readFromRosParameterServer(rclcpp::Node& nh)
     }
     
     nh.get_parameter("grab_timeout", this->grab_timeout_);
+
+    // max_consecutive_grab_failures
+    RCLCPP_DEBUG(LOGGER, "---> max_consecutive_grab_failures");
+
+    if (!nh.has_parameter("max_consecutive_grab_failures"))
+    {
+        nh.declare_parameter<int>("max_consecutive_grab_failures", 100);
+    }
+
+    nh.get_parameter("max_consecutive_grab_failures", this->max_consecutive_grab_failures_);
 
     // trigger_timeout
     RCLCPP_DEBUG(LOGGER, "---> trigger_timeout");

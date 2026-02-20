@@ -1834,6 +1834,9 @@ protected:
 
   bool is_sleeping_{false};
 
+  // consecutive grab failure counter for reconnection logic
+  int consecutive_grab_failures_{0};
+
   // diagnostics
   diagnostic_updater::Updater diagnostics_updater_;
 };

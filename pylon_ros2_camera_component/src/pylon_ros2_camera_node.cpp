@@ -961,8 +961,40 @@ void PylonROS2CameraNode::spin()
       {
         if (!this->grabImage())
         {
+          this->consecutive_grab_failures_++;
+
+          const int max_failures = this->pylon_camera_parameter_set_.max_consecutive_grab_failures_;
+          if (max_failures > 0 && this->consecutive_grab_failures_ >= max_failures)
+          {
+            RCLCPP_ERROR(LOGGER, "Reached %d consecutive grab failures, triggering camera reconnection", this->consecutive_grab_failures_);
+
+            this->cm_status_.status_id = pylon_ros2_camera_interfaces::msg::ComponentStatus::ERROR;
+            this->cm_status_.status_msg = "Too many consecutive grab failures, reconnecting";
+
+            if (this->pylon_camera_parameter_set_.enable_status_publisher_)
+            {
+              this->component_status_pub_->publish(this->cm_status_);
+            }
+
+            this->consecutive_grab_failures_ = 0;
+
+            if (this->pylon_camera_ != nullptr)
+            {
+              this->pylon_camera_.reset();
+            }
+
+            this->set_user_output_srvs_.clear();
+
+            rclcpp::Rate r(0.5);
+            r.sleep();
+
+            this->init();
+          }
+
           continue;
         }
+
+        this->consecutive_grab_failures_ = 0;
       }
 
       // compute grab time
@@ -1029,8 +1061,40 @@ void PylonROS2CameraNode::spin()
 
         if (!this->grabImage())
         {
+          this->consecutive_grab_failures_++;
+
+          const int max_failures = this->pylon_camera_parameter_set_.max_consecutive_grab_failures_;
+          if (max_failures > 0 && this->consecutive_grab_failures_ >= max_failures)
+          {
+            RCLCPP_ERROR(LOGGER, "Reached %d consecutive grab failures, triggering camera reconnection", this->consecutive_grab_failures_);
+
+            this->cm_status_.status_id = pylon_ros2_camera_interfaces::msg::ComponentStatus::ERROR;
+            this->cm_status_.status_msg = "Too many consecutive grab failures, reconnecting";
+
+            if (this->pylon_camera_parameter_set_.enable_status_publisher_)
+            {
+              this->component_status_pub_->publish(this->cm_status_);
+            }
+
+            this->consecutive_grab_failures_ = 0;
+
+            if (this->pylon_camera_ != nullptr)
+            {
+              this->pylon_camera_.reset();
+            }
+
+            this->set_user_output_srvs_.clear();
+
+            rclcpp::Rate r(0.5);
+            r.sleep();
+
+            this->init();
+          }
+
           continue;
         }
+
+        this->consecutive_grab_failures_ = 0;
 
         // compute grab time
         double grab_time = rclcpp::Clock().now().seconds();
