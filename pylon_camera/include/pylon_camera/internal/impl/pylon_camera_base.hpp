@@ -523,7 +523,7 @@ bool PylonCameraImpl<CameraTrait>::grab(Pylon::CGrabResultPtr& grab_result)
         return false;
     }
     if ( !grab_result->GrabSucceeded() )
-    {   
+    {
         ROS_ERROR_STREAM("Error: " << grab_result->GetErrorCode() << " "
                 << grab_result->GetErrorDescription());
         return false;

@@ -221,6 +221,18 @@ bool PylonGigEAce2Camera::applyCamSpecificStartupSettings(const PylonCameraParam
 
             ROS_WARN("No user set is provided -> Camera current setting will be applied");
         }
+
+        // Enable extended block IDs (64-bit) to prevent 16-bit block ID
+        // overflow which causes grab timeouts after more than 32768 frames are received
+        if ( GenApi::IsAvailable(cam_->GevGVSPExtendedIDMode) )
+        {
+            cam_->GevGVSPExtendedIDMode.SetValue(Basler_UniversalCameraParams::GevGVSPExtendedIDMode_On);
+            ROS_INFO("Enabled GevGVSPExtendedIDMode (64-bit block IDs)");
+        }
+        else
+        {
+            ROS_WARN("GevGVSPExtendedIDMode not available on this camera, 16-bit block ID overflow may occur");
+        }
     }
     catch ( const GenICam::GenericException &e )
     {

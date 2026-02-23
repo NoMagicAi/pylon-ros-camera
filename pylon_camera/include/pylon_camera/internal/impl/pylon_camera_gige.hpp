@@ -240,7 +240,7 @@ bool PylonGigECamera::applyCamSpecificStartupSettings(const PylonCameraParameter
             // from 'automatic' to 3000 if card supports it
             // Raspberry PI has MTU = 1500, max value for some cards: 9000
             cam_->GevSCPSPacketSize.SetValue(parameters.mtu_size_);
-            
+
             if (parameters.auto_flash_)
             {
                 std::map<int, bool> flash_on_lines;
@@ -304,6 +304,18 @@ bool PylonGigECamera::applyCamSpecificStartupSettings(const PylonCameraParameter
             cam_->GevSCFTD.SetValue(parameters.frame_transmission_delay_);
             
             ROS_WARN("No user set is provided -> Camera current setting will be applied");
+        }
+
+        // Enable extended block IDs (64-bit) to prevent 16-bit block ID
+        // overflow which causes grab timeouts after more than 32768 frames are received
+        if ( GenApi::IsAvailable(cam_->GevGVSPExtendedIDMode) )
+        {
+            cam_->GevGVSPExtendedIDMode.SetValue(Basler_UniversalCameraParams::GevGVSPExtendedIDMode_On);
+            ROS_INFO("Enabled GevGVSPExtendedIDMode (64-bit block IDs)");
+        }
+        else
+        {
+            ROS_WARN("GevGVSPExtendedIDMode not available on this camera, 16-bit block ID overflow may occur");
         }
     }
     catch ( const GenICam::GenericException &e )
