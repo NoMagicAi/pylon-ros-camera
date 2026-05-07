@@ -91,6 +91,8 @@ void PylonCameraParameter::readFromRosParameterServer(const ros::NodeHandle& nh)
 
     nh.param<std::string>("device_user_id", device_user_id_, "");
 
+    nh.param<std::string>("serial_no", serial_no_, "");
+
     if ( nh.hasParam("frame_rate") )
     {
         nh.getParam("frame_rate", frame_rate_);
@@ -370,6 +372,11 @@ void PylonCameraParameter::validateParameterSet(const ros::NodeHandle& nh)
 const std::string& PylonCameraParameter::deviceUserID() const
 {
     return device_user_id_;
+}
+
+const std::string& PylonCameraParameter::serialNo() const
+{
+    return serial_no_;
 }
 
 std::string PylonCameraParameter::shutterModeString() const
