@@ -1,9 +1,12 @@
 #  The tf frame under which the images were published
 camera_frame: pylon_camera
 
-#  The DeviceUserID of the camera. If empty, the first camera found in the
-#  device list will be used
+#  The DeviceUserID of the camera. If empty and serial_no is also empty, the
+#  first camera found in the device list will be used
 device_user_id: ""
+
+#  The serial number of the camera. Takes priority over device_user_id when set.
+serial_no: ""
 
 #  The CameraInfo URL (Uniform Resource Locator) where the optional intrinsic
 #  camera calibration parameters are stored. This URL string will be parsed

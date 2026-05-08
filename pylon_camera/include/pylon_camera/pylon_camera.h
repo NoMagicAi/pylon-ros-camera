@@ -61,12 +61,14 @@ public:
     static PylonCamera* create();
 
     /**
-     * Create a new PylonCamera instance based on the DeviceUserID of the camera.
-     * @param device_user_id Pylon DeviceUserID. If the string is empty, the
+     * Create a new PylonCamera instance based on the DeviceUserID or serial number.
+     * @param device_user_id Pylon DeviceUserID. If both strings are empty, the
      * first camera that could be found is returned.
+     * @param serial_no Serial number of the camera. Takes priority over device_user_id
+     * when non-empty.
      * @return new PylonCamera instance or NULL if the camera was not found.
      */
-    static PylonCamera* create(const std::string& device_user_id);
+    static PylonCamera* create(const std::string& device_user_id, const std::string& serial_no = "");
 
     /**
      * Configures the camera according to the software trigger mode.

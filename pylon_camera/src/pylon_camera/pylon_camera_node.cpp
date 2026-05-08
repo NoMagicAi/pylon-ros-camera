@@ -358,7 +358,8 @@ void PylonCameraNode::init()
 bool PylonCameraNode::initAndRegister()
 {
     pylon_camera_ = PylonCamera::create(
-                                    pylon_camera_parameter_set_.deviceUserID());
+                                    pylon_camera_parameter_set_.deviceUserID(),
+                                    pylon_camera_parameter_set_.serialNo());
 
     if (pylon_camera_ == nullptr)
     {
@@ -378,7 +379,8 @@ bool PylonCameraNode::initAndRegister()
         ros::Rate r(0.5);
         while ( ros::ok() && pylon_camera_ == nullptr )
         {
-            pylon_camera_ = PylonCamera::create(pylon_camera_parameter_set_.deviceUserID());
+            pylon_camera_ = PylonCamera::create(pylon_camera_parameter_set_.deviceUserID(),
+                                                pylon_camera_parameter_set_.serialNo());
             
             if (ros::Time::now() > end)
             {

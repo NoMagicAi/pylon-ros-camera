@@ -91,6 +91,8 @@ void PylonCameraParameter::readFromRosParameterServer(const ros::NodeHandle& nh)
 
     nh.param<std::string>("device_user_id", device_user_id_, "");
 
+    nh.param<std::string>("serial_no", serial_no_, "");
+
     if ( nh.hasParam("frame_rate") )
     {
         nh.getParam("frame_rate", frame_rate_);
@@ -321,13 +323,17 @@ void PylonCameraParameter::adaptDeviceUserId(const ros::NodeHandle& nh, const st
 
 void PylonCameraParameter::validateParameterSet(const ros::NodeHandle& nh)
 {
-    if (!device_user_id_.empty())
+    if (!serial_no_.empty())
     {
-        ROS_INFO_STREAM("Trying to connect the camera device with the following device user id: " << this->device_user_id_.c_str());
+        ROS_INFO_STREAM("Trying to connect the camera device with serial number: " << serial_no_);
+    }
+    else if (!device_user_id_.empty())
+    {
+        ROS_INFO_STREAM("Trying to connect the camera device with device user id: " << device_user_id_);
     }
     else
     {
-        ROS_INFO_STREAM("No Device User ID set -> Will connect the first available camera device");
+        ROS_INFO_STREAM("No Serial Number or Device User ID set -> Will connect the first available camera device");
     }
 
     if (frame_rate_ < 0 && frame_rate_ != -1)
@@ -370,6 +376,11 @@ void PylonCameraParameter::validateParameterSet(const ros::NodeHandle& nh)
 const std::string& PylonCameraParameter::deviceUserID() const
 {
     return device_user_id_;
+}
+
+const std::string& PylonCameraParameter::serialNo() const
+{
+    return serial_no_;
 }
 
 std::string PylonCameraParameter::shutterModeString() const
